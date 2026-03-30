@@ -1,0 +1,17 @@
+out.log
+err.log
+out2.log
+err2.log
+zig-test.log
+*-tmp.log
+tmp.zig
+.tmp*
+.zig-cache/
+.zig-cache-global/
+.zig-cache-local/
+.zig-global-cache/
+zig-out/
+.zig-opencode-data/
+zig-opencode.exe
+zig-opencode.pdb
+.DS_Store
