@@ -31,6 +31,7 @@ pub const FormatterConfig = view.FormatterConfig;
 pub const FormatterDefinitionConfig = view.FormatterDefinitionConfig;
 pub const ToolPolicy = view.ToolPolicy;
 pub const AnthropicProviderConfig = view.AnthropicProviderConfig;
+pub const OpenAIProviderConfig = view.OpenAIProviderConfig;
 
 test "config module exports are stable" {
     try std.testing.expectEqualStrings("config", MODULE_NAME);

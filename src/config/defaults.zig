@@ -15,6 +15,7 @@ const bootstrap_entries = [_]framework.ConfigDefaultEntry{
     .{ .path = schema.keys.mcp_servers, .value_kind = .array, .value_json = "[]" },
     .{ .path = schema.keys.formatter_definitions, .value_kind = .array, .value_json = "[]" },
     .{ .path = schema.keys.provider_anthropic_timeout_ms, .value_kind = .integer, .value_json = "300000" },
+    .{ .path = schema.keys.provider_openai_timeout_ms, .value_kind = .integer, .value_json = "300000" },
     .{ .path = schema.keys.tool_read_file_enabled, .value_kind = .boolean, .value_json = "true" },
     .{ .path = schema.keys.tool_write_file_enabled, .value_kind = .boolean, .value_json = "true" },
     .{ .path = schema.keys.tool_execute_shell_enabled, .value_kind = .boolean, .value_json = "true" },

@@ -152,6 +152,17 @@ pub const AnthropicProviderConfig = struct {
     }
 };
 
+pub const OpenAIProviderConfig = struct {
+    base_url: ?[]const u8 = null,
+    api_key: ?[]const u8 = null,
+    timeout_ms: ?u32 = null,
+
+    pub fn deinit(self: *OpenAIProviderConfig, allocator: std.mem.Allocator) void {
+        if (self.base_url) |base_url| allocator.free(base_url);
+        if (self.api_key) |api_key| allocator.free(api_key);
+    }
+};
+
 pub const EffectiveConfig = struct {
     model: ModelConfig,
     default_agent: []const u8,
@@ -164,6 +175,7 @@ pub const EffectiveConfig = struct {
     formatter: FormatterConfig,
     tools: ToolPolicy,
     anthropic: AnthropicProviderConfig,
+    openai: OpenAIProviderConfig,
 
     pub fn deinit(self: *EffectiveConfig, allocator: std.mem.Allocator) void {
         if (self.model.default_model) |model| {
@@ -182,6 +194,7 @@ pub const EffectiveConfig = struct {
         self.mcp.deinit(allocator);
         self.formatter.deinit(allocator);
         self.anthropic.deinit(allocator);
+        self.openai.deinit(allocator);
     }
 };
 
@@ -235,6 +248,11 @@ pub fn buildEffectiveConfig(
             .base_url = try loadOptionalString(allocator, loader, schema.keys.provider_anthropic_base_url),
             .api_key = try loadOptionalString(allocator, loader, schema.keys.provider_anthropic_api_key),
             .timeout_ms = if (try loadOptionalInt(loader, schema.keys.provider_anthropic_timeout_ms)) |value| @intCast(value) else null,
+        },
+        .openai = .{
+            .base_url = try loadOptionalString(allocator, loader, schema.keys.provider_openai_base_url),
+            .api_key = try loadOptionalString(allocator, loader, schema.keys.provider_openai_api_key),
+            .timeout_ms = if (try loadOptionalInt(loader, schema.keys.provider_openai_timeout_ms)) |value| @intCast(value) else null,
         },
     };
 }

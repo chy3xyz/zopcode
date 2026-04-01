@@ -128,6 +128,13 @@ pub const AppContext = struct {
         if (effective_config.anthropic.api_key) |api_key| {
             try provider_auth_runtime.seedApiKeyIfMissing("anthropic", api_key);
         }
+        if (effective_config.openai.api_key) |api_key| {
+            try provider_auth_runtime.seedApiKeyIfMissing("openai", api_key);
+        }
+        if (try provider.loadOpenAIApiKey(allocator)) |api_key| {
+            defer allocator.free(api_key);
+            try provider_auth_runtime.seedApiKeyIfMissing("openai", api_key);
+        }
         bootstrap_logger.info("provider auth runtime initialized", &.{
             framework.LogField.string("store_path", provider_auth_runtime.store_path),
         });
@@ -137,7 +144,16 @@ pub const AppContext = struct {
         provider_registry.* = provider.ProviderRegistry.init(allocator, framework_app.logger, framework_app.eventBus());
         errdefer provider_registry.deinit();
         provider_registry.setAuthRuntime(provider_auth_runtime);
+        try provider_registry.setProviderRuntimeConfig("anthropic", .{
+            .base_url = effective_config.anthropic.base_url,
+            .timeout_ms = effective_config.anthropic.timeout_ms,
+        });
+        try provider_registry.setProviderRuntimeConfig("openai", .{
+            .base_url = effective_config.openai.base_url,
+            .timeout_ms = effective_config.openai.timeout_ms,
+        });
         try provider_registry.registerAnthropic();
+        try provider_registry.registerOpenAI();
         bootstrap_logger.info("provider registry initialized", &.{
             framework.LogField.boolean("has_default_model", effective_config.model.default_model != null),
             framework.LogField.string("provider_id", "anthropic"),
@@ -628,6 +644,7 @@ test "zig-opencode app context composes framework app context" {
     try std.testing.expect(app_context.agent_registry.get("explore") != null);
     try std.testing.expect(app_context.agent_registry.get("oracle") != null);
     try std.testing.expect(app_context.provider_registry.getProvider("anthropic") != null);
+    try std.testing.expect(app_context.provider_registry.getProvider("openai") != null);
     try std.testing.expect(app_context.tool_registry.get("read_file") != null);
     try std.testing.expect(app_context.tool_registry.get("execute_shell") != null);
     try std.testing.expect(app_context.tool_registry.get("lsp") != null);

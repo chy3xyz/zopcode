@@ -61,7 +61,7 @@ pub const CategoryResolver = struct {
     }
 
     fn isModelAvailable(self: *const Self, model_ref: provider.ModelRef) bool {
-        return self.registry.getProvider(model_ref.provider_id) != null;
+        return self.registry.isModelReady(model_ref);
     }
 };
 
@@ -111,4 +111,61 @@ test "category execution plan includes prompt append and variant data" {
     try std.testing.expect(plan.selected_variant != null);
     try std.testing.expect(plan.prompt_append != null);
     try std.testing.expect(std.mem.indexOf(u8, plan.prompt_append.?, "deeper analysis") != null);
+}
+
+test "category resolver selects openai when credentials are ready" {
+    var tmp_dir = std.testing.tmpDir(.{});
+    defer tmp_dir.cleanup();
+    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    defer std.testing.allocator.free(root_path);
+    const auth_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "provider-auth.json" });
+    defer std.testing.allocator.free(auth_path);
+
+    var auth_runtime = try provider.ProviderAuthRuntime.init(std.testing.allocator, null, auth_path);
+    defer {
+        auth_runtime.deinit();
+        std.testing.allocator.destroy(auth_runtime);
+    }
+    try auth_runtime.setApiKey("anthropic", "anthropic-secret");
+    try auth_runtime.setApiKey("openai", "openai-secret");
+
+    var registry = provider.ProviderRegistry.init(std.testing.allocator, null, null);
+    defer registry.deinit();
+    registry.setAuthRuntime(auth_runtime);
+    try registry.registerAnthropic();
+    try registry.registerOpenAI();
+
+    const resolver = CategoryResolver.init(std.testing.allocator, &registry);
+    var plan = try resolver.resolve(.visual);
+    defer plan.deinit(std.testing.allocator);
+
+    try std.testing.expectEqualStrings("openai", plan.selected_model.provider_id);
+}
+
+test "category resolver falls back to anthropic when openai is unready" {
+    var tmp_dir = std.testing.tmpDir(.{});
+    defer tmp_dir.cleanup();
+    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    defer std.testing.allocator.free(root_path);
+    const auth_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "provider-auth.json" });
+    defer std.testing.allocator.free(auth_path);
+
+    var auth_runtime = try provider.ProviderAuthRuntime.init(std.testing.allocator, null, auth_path);
+    defer {
+        auth_runtime.deinit();
+        std.testing.allocator.destroy(auth_runtime);
+    }
+    try auth_runtime.setApiKey("anthropic", "anthropic-secret");
+
+    var registry = provider.ProviderRegistry.init(std.testing.allocator, null, null);
+    defer registry.deinit();
+    registry.setAuthRuntime(auth_runtime);
+    try registry.registerAnthropic();
+    try registry.registerOpenAI();
+
+    const resolver = CategoryResolver.init(std.testing.allocator, &registry);
+    var plan = try resolver.resolve(.visual);
+    defer plan.deinit(std.testing.allocator);
+
+    try std.testing.expectEqualStrings("anthropic", plan.selected_model.provider_id);
 }

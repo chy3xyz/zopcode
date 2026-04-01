@@ -36,6 +36,7 @@ test "agent module exports built-in registry surface" {
     var provider_registry = @import("../provider/root.zig").ProviderRegistry.init(std.testing.allocator, null, null);
     defer provider_registry.deinit();
     try provider_registry.registerAnthropic();
+    try provider_registry.registerOpenAI();
     var resolver = CategoryResolver.init(std.testing.allocator, &provider_registry);
     var plan = try resolver.resolve(.quick);
     defer plan.deinit(std.testing.allocator);

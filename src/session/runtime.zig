@@ -459,12 +459,18 @@ pub const SessionRuntime = struct {
     fn resolveModel(self: *Self, profile: *const agent.AgentProfile, requested: ?provider.ModelRef, category_selected: ?provider.ModelRef) !OwnedModelRef {
         if (requested) |model| return try OwnedModelRef.init(self.allocator, model.provider_id, model.model_id);
         if (category_selected) |model| return try OwnedModelRef.init(self.allocator, model.provider_id, model.model_id);
-        if (profile.default_model) |model| return try OwnedModelRef.init(self.allocator, model.provider_id, model.model_id);
+        if (profile.default_model) |model| {
+            if (self.deps.provider_registry.isModelReady(model)) {
+                return try OwnedModelRef.init(self.allocator, model.provider_id, model.model_id);
+            }
+        }
 
         var effective = try self.deps.config_runtime.effective(self.allocator);
         defer effective.deinit(self.allocator);
         if (effective.model.default_model) |model| {
-            return try OwnedModelRef.init(self.allocator, model.provider_id, model.model_id);
+            if (self.deps.provider_registry.isModelReady(model)) {
+                return try OwnedModelRef.init(self.allocator, model.provider_id, model.model_id);
+            }
         }
 
         const default_model = self.deps.provider_registry.defaultModel() orelse return error.ProviderModelUnavailable;

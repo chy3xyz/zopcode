@@ -48,7 +48,8 @@ pub const AnthropicClient = struct {
     logger: ?*framework.Logger,
     event_bus: ?framework.EventBus,
     api_key: ?[]u8,
-    endpoint: []const u8 = "https://api.anthropic.com/v1/messages",
+    endpoint: []u8,
+    timeout_ms: ?u32 = null,
 
     const Self = @This();
 
@@ -62,11 +63,13 @@ pub const AnthropicClient = struct {
             try allocator.dupe(u8, value)
         else
             try auth.loadAnthropicApiKey(allocator);
+        const endpoint = try allocator.dupe(u8, "https://api.anthropic.com/v1/messages");
         return .{
             .allocator = allocator,
             .logger = logger,
             .event_bus = event_bus,
             .api_key = api_key,
+            .endpoint = endpoint,
         };
     }
 
@@ -79,6 +82,7 @@ pub const AnthropicClient = struct {
 
     pub fn deinit(self: *Self) void {
         if (self.api_key) |key| self.allocator.free(key);
+        self.allocator.free(self.endpoint);
     }
 
     pub fn stream(self: *Self, ctx: client_model.ProviderExecutionContext, request: client_model.ProviderRequest, sink: client_model.LlmEventSink) !void {
@@ -391,6 +395,11 @@ pub const AnthropicClient = struct {
 pub fn createClient(allocator: std.mem.Allocator, ctx: @import("../registry.zig").ProviderRegistry.ProviderCreateContext) !client_model.ProviderClient {
     const client = try allocator.create(AnthropicClient);
     client.* = try AnthropicClient.init(allocator, ctx.logger, ctx.event_bus, ctx.api_key);
+    if (ctx.base_url) |base_url| {
+        client.allocator.free(client.endpoint);
+        client.endpoint = try allocator.dupe(u8, base_url);
+    }
+    client.timeout_ms = ctx.timeout_ms;
     return client.asProviderClient();
 }
 
@@ -497,7 +506,9 @@ test "anthropic SSE parser emits text and completed tool call events" {
         .logger = null,
         .event_bus = bus.asEventBus(),
         .api_key = null,
+        .endpoint = try std.testing.allocator.dupe(u8, "https://api.anthropic.com/v1/messages"),
     };
+    defer std.testing.allocator.free(client.endpoint);
 
     var sink_state = Sink{ .allocator = std.testing.allocator };
     defer sink_state.deinit();

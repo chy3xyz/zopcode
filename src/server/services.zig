@@ -236,7 +236,12 @@ pub const ServerServices = struct {
         }
 
         const effective_default_model = if (effective.model.default_model) |model|
-            try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ model.provider_id, model.model_id })
+            if (self.app_context.provider_registry.isModelReady(model))
+                try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ model.provider_id, model.model_id })
+            else if (self.app_context.provider_registry.defaultModel()) |fallback_model|
+                try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ fallback_model.provider_id, fallback_model.model_id })
+            else
+                null
         else if (self.app_context.provider_registry.defaultModel()) |model|
             try std.fmt.allocPrint(self.allocator, "{s}/{s}", .{ model.provider_id, model.model_id })
         else

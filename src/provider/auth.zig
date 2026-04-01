@@ -8,6 +8,13 @@ pub fn loadAnthropicApiKey(allocator: std.mem.Allocator) !?[]u8 {
     };
 }
 
+pub fn loadOpenAIApiKey(allocator: std.mem.Allocator) !?[]u8 {
+    return std.process.getEnvVarOwned(allocator, "OPENAI_API_KEY") catch |err| switch (err) {
+        error.EnvironmentVariableNotFound => null,
+        else => err,
+    };
+}
+
 pub const ProviderAuthStatus = struct {
     provider_id: []const u8,
     has_api_key: bool,
@@ -186,6 +193,11 @@ pub const ProviderAuthRuntime = struct {
 
 test "missing anthropic api key returns null" {
     const key = try loadAnthropicApiKey(std.testing.allocator);
+    defer if (key) |owned| std.testing.allocator.free(owned);
+}
+
+test "missing openai api key returns null" {
+    const key = try loadOpenAIApiKey(std.testing.allocator);
     defer if (key) |owned| std.testing.allocator.free(owned);
 }
 

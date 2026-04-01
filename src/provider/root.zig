@@ -10,6 +10,7 @@ pub const auth = @import("auth.zig");
 pub const transform = @import("transform.zig");
 pub const builtin = struct {
     pub const anthropic = @import("builtin/anthropic.zig");
+    pub const openai = @import("builtin/openai.zig");
 };
 
 pub const ModelRef = model.ModelRef;
@@ -19,6 +20,8 @@ pub const ProviderMessage = model.ProviderMessage;
 pub const ProviderToolDefinition = model.ProviderToolDefinition;
 pub const AuthKind = provider.AuthKind;
 pub const ProviderInfo = provider.ProviderInfo;
+pub const loadAnthropicApiKey = auth.loadAnthropicApiKey;
+pub const loadOpenAIApiKey = auth.loadOpenAIApiKey;
 pub const ProviderAuthRuntime = auth.ProviderAuthRuntime;
 pub const ProviderAuthStatus = auth.ProviderAuthStatus;
 pub const ProviderRequest = client.ProviderRequest;

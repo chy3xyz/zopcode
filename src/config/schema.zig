@@ -17,6 +17,9 @@ pub const keys = struct {
     pub const provider_anthropic_base_url = "provider.anthropic.base_url";
     pub const provider_anthropic_api_key = "provider.anthropic.api_key";
     pub const provider_anthropic_timeout_ms = "provider.anthropic.timeout_ms";
+    pub const provider_openai_base_url = "provider.openai.base_url";
+    pub const provider_openai_api_key = "provider.openai.api_key";
+    pub const provider_openai_timeout_ms = "provider.openai.timeout_ms";
     pub const tool_read_file_enabled = "tools.read_file.enabled";
     pub const tool_write_file_enabled = "tools.write_file.enabled";
     pub const tool_execute_shell_enabled = "tools.execute_shell.enabled";
@@ -204,6 +207,24 @@ const field_definitions = [_]framework.FieldDefinition{
     },
     .{
         .key = keys.provider_anthropic_timeout_ms,
+        .required = false,
+        .value_kind = .integer,
+        .rules = &.{.{ .int_range = .{ .min = 1 } }},
+    },
+    .{
+        .key = keys.provider_openai_base_url,
+        .required = false,
+        .value_kind = .string,
+    },
+    .{
+        .key = keys.provider_openai_api_key,
+        .required = false,
+        .sensitive = true,
+        .value_kind = .string,
+        .rules = &.{.non_empty_string},
+    },
+    .{
+        .key = keys.provider_openai_timeout_ms,
         .required = false,
         .value_kind = .integer,
         .rules = &.{.{ .int_range = .{ .min = 1 } }},
