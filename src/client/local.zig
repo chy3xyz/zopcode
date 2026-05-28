@@ -49,7 +49,8 @@ pub const LocalTransport = struct {
     pub fn init(allocator: std.mem.Allocator, services: *server.ServerServices) !*Self {
         const self = try allocator.create(Self);
         self.* = .{
-                        .services = services,
+            .allocator = allocator,
+            .services = services,
         };
         return self;
     }
@@ -245,7 +246,8 @@ pub const LocalTransport = struct {
         const self: *Self = @ptrCast(@alignCast(ptr));
         const subscription = try allocator.create(LocalEventSubscription);
         subscription.* = .{
-                        .event_bus = self.services.app_context.eventBus(),
+            .allocator = allocator,
+            .event_bus = self.services.app_context.eventBus(),
             .subscription_id = try self.services.app_context.eventBus().subscribe(&.{}, after_seq),
         };
         return subscription.asSubscription();

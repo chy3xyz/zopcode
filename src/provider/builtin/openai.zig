@@ -73,7 +73,8 @@ pub const OpenAIClient = struct {
             try auth.loadOpenAIApiKey(allocator);
         const endpoint = try allocator.dupe(u8, "https://api.openai.com/v1/responses");
         return .{
-                        .logger = logger,
+            .allocator = allocator,
+            .logger = logger,
             .event_bus = event_bus,
             .api_key = api_key,
             .endpoint = endpoint,

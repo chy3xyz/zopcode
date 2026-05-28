@@ -49,7 +49,8 @@ pub const ProviderAuthRuntime = struct {
         const self = try allocator.create(Self);
         errdefer allocator.destroy(self);
         self.* = .{
-                        .logger = logger,
+            .allocator = allocator,
+            .logger = logger,
             .store_path = try allocator.dupe(u8, store_path),
         };
         errdefer allocator.free(self.store_path);

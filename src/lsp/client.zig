@@ -154,7 +154,8 @@ pub const StdioLspClient = struct {
         errdefer child.kill(io);
 
         self.* = .{
-                        .server_id = try allocator.dupe(u8, server.id),
+            .allocator = allocator,
+            .server_id = try allocator.dupe(u8, server.id),
             .root_path = try allocator.dupe(u8, root_path),
             .sink = sink,
             .child = child,

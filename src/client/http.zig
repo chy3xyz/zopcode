@@ -84,7 +84,8 @@ pub const HttpTransport = struct {
     pub fn initWithRequester(allocator: std.mem.Allocator, base_url: []const u8, requester: Requester) !*Self {
         const self = try allocator.create(Self);
         self.* = .{
-                        .base_url = try allocator.dupe(u8, base_url),
+            .allocator = allocator,
+            .base_url = try allocator.dupe(u8, base_url),
             .requester = requester,
         };
         return self;
@@ -419,7 +420,8 @@ pub const HttpTransport = struct {
         const self: *Self = @ptrCast(@alignCast(ptr));
         const subscription = try allocator.create(HttpEventSubscription);
         subscription.* = .{
-                        .base_url = try allocator.dupe(u8, self.base_url),
+            .allocator = allocator,
+            .base_url = try allocator.dupe(u8, self.base_url),
             .after_seq = after_seq,
             .queue = .empty,
             .stop_requested = .init(false),

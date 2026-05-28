@@ -21,7 +21,8 @@ pub const ServerServices = struct {
 
     pub fn init(allocator: std.mem.Allocator, app_context: *app_context_model.AppContext) Self {
         return .{
-                        .app_context = app_context,
+            .allocator = allocator,
+            .app_context = app_context,
         };
     }
 

@@ -35,7 +35,7 @@ pub const ToolResult = struct {
     }
 };
 
-fn writeJsonString(writer: anytype, value: []const u8) !void {
+fn writeJsonString(buf: anytype, allocator: std.mem.Allocator, value: []const u8) !void {
     try buf.append(allocator, '"');
     for (value) |ch| {
         switch (ch) {

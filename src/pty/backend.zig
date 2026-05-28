@@ -113,7 +113,8 @@ pub const ShellHandle = struct {
         // errdefer child.kill catch {};
 
         self.* = .{
-                        .pty_id = try allocator.dupe(u8, request.pty_id),
+            .allocator = allocator,
+            .pty_id = try allocator.dupe(u8, request.pty_id),
             .shell = try allocator.dupe(u8, if (request.shell) |value| value else argv[0]),
             .child = child,
             .sink = sink,
@@ -153,7 +154,7 @@ pub const ShellHandle = struct {
         while (!self.write_mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.write_mutex.unlock();
         if (self.child.stdin == null) return error.PtyClosed;
-        try self.child.stdin.?.writeAll(data);
+        try self.child.stdin.?.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), data);
     }
 
     fn close(self: *Self) void {
@@ -163,8 +164,8 @@ pub const ShellHandle = struct {
         self.state_mutex.unlock();
         if (already_closed) return;
 
-        if (self.child.stdin) |*stdin| stdin.close();
-        _ = self.child.kill() catch {};
+        if (self.child.stdin) |*stdin| stdin.close(std.Io.Threaded.global_single_threaded.*.io());
+        self.child.kill(std.Io.Threaded.global_single_threaded.*.io());
     }
 
     fn deinit(self: *Self) void {
@@ -173,8 +174,8 @@ pub const ShellHandle = struct {
         if (self.stderr_thread) |thread| thread.join();
         if (self.wait_thread) |thread| thread.join();
 
-        if (self.child.stdout) |*stdout| stdout.close();
-        if (self.child.stderr) |*stderr| stderr.close();
+        if (self.child.stdout) |*stdout| stdout.close(std.Io.Threaded.global_single_threaded.*.io());
+        if (self.child.stderr) |*stderr| stderr.close(std.Io.Threaded.global_single_threaded.*.io());
 
         self.allocator.free(self.pty_id);
         self.allocator.free(self.shell);
@@ -188,14 +189,14 @@ pub const ShellHandle = struct {
         } orelse return;
 
         while (true) {
-            const read_len = file.read(buffer[0..]) catch return;
+            const read_len = std.posix.read(file.handle, buffer[0..]) catch return;
             if (read_len == 0) return;
             self.sink.onOutput(self.pty_id, stream_kind, buffer[0..read_len]) catch return;
         }
     }
 
     fn waitMain(self: *Self) void {
-        const term = self.child.wait() catch {
+        const term = self.child.wait(std.Io.Threaded.global_single_threaded.*.io()) catch {
             self.sink.onExit(self.pty_id, 1) catch {};
             return;
         };

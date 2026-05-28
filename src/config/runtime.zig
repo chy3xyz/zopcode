@@ -33,7 +33,8 @@ pub const ConfigRuntime = struct {
         options: RuntimeOptions,
     ) !Self {
         var self = Self{
-                        .dependencies = dependencies,
+            .allocator = allocator,
+            .dependencies = dependencies,
             .defaults = defaults.bootstrapDefaults(),
             .resolved_paths = try paths.resolve(allocator, options),
             .env_prefix = try allocator.dupe(u8, options.env_prefix),

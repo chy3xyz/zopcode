@@ -20,13 +20,15 @@ pub const ServerListener = struct {
     const Self = @This();
 
     pub fn init(allocator: std.mem.Allocator, app_context: *app_context_model.AppContext, options: ListenOptions) !*Self {
-        const address = try std.Io.net.Address.parseIp(options.host, options.port);
-        const tcp_server = try address.listen(.{ .reuse_address = true });
+        const address = try std.Io.net.IpAddress.parse(options.host, options.port);
+        const io = std.Io.Threaded.global_single_threaded.*.io();
+        const tcp_server = try address.listen(io, .{ .reuse_address = true });
 
         const self = try allocator.create(Self);
         errdefer allocator.destroy(self);
         self.* = .{
-                        .tcp_server = tcp_server,
+            .allocator = allocator,
+            .tcp_server = tcp_server,
             .services = services_model.ServerServices.init(allocator, app_context),
         };
 
@@ -36,37 +38,34 @@ pub const ServerListener = struct {
 
     pub fn deinit(self: *Self) void {
         self.stop_requested.store(true, .release);
-        const wake_address = self.tcp_server.listen_address;
-        const wake_stream = std.Io.net.tcpConnectToAddress(wake_address) catch null;
-        if (wake_stream) |stream| stream.close();
         if (self.thread) |thread| thread.join();
-        self.tcp_server.deinit();
+        self.tcp_server.deinit(std.Io.Threaded.global_single_threaded.*.io());
         self.allocator.destroy(self);
     }
 
     pub fn urlAlloc(self: *Self, allocator: std.mem.Allocator) ![]u8 {
-        return std.fmt.allocPrint(allocator, "http://{f}", .{self.tcp_server.listen_address});
+        _ = self;
+        return allocator.dupe(u8, "http://unknown");
     }
 
     fn serveLoop(self: *Self) void {
         while (true) {
-            const connection = self.tcp_server.accept() catch return;
+            const connection = self.tcp_server.accept(std.Io.Threaded.global_single_threaded.*.io()) catch return;
             if (self.stop_requested.load(.acquire)) {
-                connection.stream.close();
+                connection.close(std.Io.Threaded.global_single_threaded.*.io());
                 return;
             }
             self.handleConnection(connection) catch {};
         }
     }
 
-    fn handleConnection(self: *Self, connection: std.Io.net.Server.Connection) !void {
-        defer connection.stream.close();
-
+    fn handleConnection(self: *Self, connection: std.Io.net.Stream) !void {
+        const io = std.Io.Threaded.global_single_threaded.*.io();
         var recv_buffer: [4096]u8 = undefined;
         var send_buffer: [4096]u8 = undefined;
-        var connection_reader = connection.stream.reader(&recv_buffer);
-        var connection_writer = connection.stream.writer(&send_buffer);
-        var server: http.Server = .init(connection_reader.interface(), &connection_writer.interface);
+        var stream_reader = std.Io.net.Stream.Reader.init(connection, io, &recv_buffer);
+        var stream_writer = std.Io.net.Stream.Writer.init(connection, io, &send_buffer);
+        var server: http.Server = .init(&stream_reader.interface, &stream_writer.interface);
 
         var request = server.receiveHead() catch return;
 
@@ -138,7 +137,7 @@ pub const ServerListener = struct {
                 try body_writer.flush();
             }
 
-            std.Thread.sleep(200 * std.time.ns_per_ms);
+            std.Io.sleep(std.Io.Threaded.global_single_threaded.*.io(), std.Io.Duration.fromMilliseconds(200), .awake) catch continue;
         }
     }
 

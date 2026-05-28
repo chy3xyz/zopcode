@@ -122,7 +122,8 @@ pub const StdioMcpClient = struct {
         errdefer child.kill(io);
 
         self.* = .{
-                        .server_id = try allocator.dupe(u8, server.id),
+            .allocator = allocator,
+            .server_id = try allocator.dupe(u8, server.id),
             .child = child,
         };
         errdefer allocator.free(self.server_id);

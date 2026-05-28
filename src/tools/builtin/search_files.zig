@@ -30,11 +30,11 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
     defer output.deinit(ctx.allocator);
     var metadata: std.ArrayListUnmanaged(u8) = .empty;
     defer metadata.deinit(ctx.allocator);
-    try metadata.writer(ctx.allocator).writeByte('[');
+    try metadata.append(ctx.allocator, '[');
 
     var match_count: usize = 0;
     try searchDir(ctx.allocator, resolved, query, &output, &metadata, &match_count);
-    try metadata.writer(ctx.allocator).writeByte(']');
+    try metadata.append(ctx.allocator, ']');
 
     ctx.logger.child("tools").child("search_files").info("tool executed", &.{
         framework.LogField.string("path", resolved),
@@ -94,9 +94,17 @@ fn searchFile(
     var line_no: usize = 1;
     while (lines.next()) |line| : (line_no += 1) {
         if (std.mem.indexOf(u8, line, query) == null) continue;
-        if (match_count.* > 0) try metadata.writer(allocator).writeByte(',');
-        try output.writer(allocator).print("{s}:{d}:{s}\n", .{ path, line_no, line });
-        try metadata.writer(allocator).print("{{\"path\":\"{s}\",\"line\":{d}}}", .{ path, line_no });
+        if (match_count.* > 0) try metadata.append(allocator, ',');
+        {
+            const line_out = try std.fmt.allocPrint(allocator, "{s}:{d}:{s}\n", .{ path, line_no, line });
+            defer allocator.free(line_out);
+            try output.appendSlice(allocator, line_out);
+        }
+        {
+            const meta_out = try std.fmt.allocPrint(allocator, "{{\"path\":\"{s}\",\"line\":{d}}}", .{ path, line_no });
+            defer allocator.free(meta_out);
+            try metadata.appendSlice(allocator, meta_out);
+        }
         match_count.* += 1;
     }
 }

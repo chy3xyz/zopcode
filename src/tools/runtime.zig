@@ -58,7 +58,8 @@ pub const ToolRuntime = struct {
         working_dir: []const u8,
     ) !Self {
         var self = Self{
-                        .registry = registry,
+            .allocator = allocator,
+            .registry = registry,
             .logger = logger,
             .task_runner = task_runner,
             .event_bus = event_bus,
@@ -401,31 +402,39 @@ fn buildPermissionMetadata(allocator: std.mem.Allocator, tool_id: []const u8, fi
         try out.append(allocator, '"');
         try writeJsonStringFragment(&out, allocator, field.key);
         try out.appendSlice(allocator, "\":");
-        try writeValidationValueJson(writer, field.value);
+                        try writeValidationValueJson(&out, allocator, field.value);
     }
     try out.appendSlice(allocator, "}}");
     return allocator.dupe(u8, out.items);
 }
 
-fn writeValidationValueJson(writer: anytype, value: framework.ValidationValue) !void {
+fn writeValidationValueJson(out: *std.ArrayListUnmanaged(u8), allocator: std.mem.Allocator, value: framework.ValidationValue) !void {
     switch (value) {
         .string => |text| {
             try out.append(allocator, '"');
-            try writeJsonStringFragment(&out, allocator, text);
+            try writeJsonStringFragment(out, allocator, text);
             try out.append(allocator, '"');
         },
-        .integer => |number| try out.print(allocator, "{d}", .{number}),
+        .integer => |number| {
+            const buf = try std.fmt.allocPrint(allocator, "{d}", .{number});
+            defer allocator.free(buf);
+            try out.appendSlice(allocator, buf);
+        },
         .boolean => |flag| try out.appendSlice(allocator, if (flag) "true" else "false"),
-        .float => |number| try out.print(allocator, "{d}", .{number}),
+        .float => |number| {
+            const buf = try std.fmt.allocPrint(allocator, "{d}", .{number});
+            defer allocator.free(buf);
+            try out.appendSlice(allocator, buf);
+        },
         .null => try out.appendSlice(allocator, "null"),
         .object => |fields| {
             try out.append(allocator, '{');
             for (fields, 0..) |field, index| {
                 if (index > 0) try out.append(allocator, ',');
                 try out.append(allocator, '"');
-                try writeJsonStringFragment(&out, allocator, field.key);
+                try writeJsonStringFragment(out, allocator, field.key);
                 try out.appendSlice(allocator, "\":");
-                try writeValidationValueJson(writer, field.value);
+                try writeValidationValueJson(out, allocator, field.value);
             }
             try out.append(allocator, '}');
         },
@@ -433,14 +442,14 @@ fn writeValidationValueJson(writer: anytype, value: framework.ValidationValue) !
             try out.append(allocator, '[');
             for (items, 0..) |item, index| {
                 if (index > 0) try out.append(allocator, ',');
-                try writeValidationValueJson(writer, item);
+                try writeValidationValueJson(out, allocator, item);
             }
             try out.append(allocator, ']');
         },
     }
 }
 
-fn writeJsonStringFragment(writer: anytype, value: []const u8) !void {
+fn writeJsonStringFragment(out: *std.ArrayListUnmanaged(u8), allocator: std.mem.Allocator, value: []const u8) !void {
     for (value) |ch| {
         switch (ch) {
             '"' => try out.appendSlice(allocator, "\\\""),
@@ -450,7 +459,9 @@ fn writeJsonStringFragment(writer: anytype, value: []const u8) !void {
             '\t' => try out.appendSlice(allocator, "\\t"),
             else => {
                 if (ch < 32) {
-                    try out.print(allocator, "\\u00{x:0>2}", .{ch});
+                    const escaped = try std.fmt.allocPrint(allocator, "\\u00{x:0>2}", .{ch});
+                    defer allocator.free(escaped);
+                    try out.appendSlice(allocator, escaped);
                 } else {
                     try out.append(allocator, ch);
                 }

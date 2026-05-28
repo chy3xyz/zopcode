@@ -545,7 +545,8 @@ const OwnedModelRef = struct {
 
     fn init(allocator: std.mem.Allocator, provider_id: []const u8, model_id: []const u8) !OwnedModelRef {
         return .{
-                        .value = .{
+            .allocator = allocator,
+            .value = .{
                 .provider_id = try allocator.dupe(u8, provider_id),
                 .model_id = try allocator.dupe(u8, model_id),
             },
@@ -704,7 +705,8 @@ const ToolTaskJobData = struct {
         defer freeValidationFields(allocator, params);
 
         const command_ctx = framework.CommandContext{
-                        .request = .{
+            .allocator = allocator,
+            .request = .{
                 .request_id = self.task.request_id,
                 .trace_id = self.task.trace_id,
                 .source = .service,

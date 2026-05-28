@@ -59,7 +59,7 @@ pub fn childResultsJson(allocator: std.mem.Allocator, items: []const types.Child
     return allocator.dupe(u8, buf.items);
 }
 
-fn writeJsonString(writer: anytype, value: []const u8) !void {
+fn writeJsonString(buf: anytype, allocator: std.mem.Allocator, value: []const u8) !void {
     try buf.append(allocator, '"');
     for (value) |ch| {
         switch (ch) {

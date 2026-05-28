@@ -37,7 +37,8 @@ pub const FileSnapshotStore = struct {
     pub fn init(allocator: std.mem.Allocator, root_path: []const u8) !Self {
         _ = std.c.mkdir(@ptrCast(root_path.ptr), 0o755);
         return .{
-                        .root_path = try allocator.dupe(u8, root_path),
+            .allocator = allocator,
+            .root_path = try allocator.dupe(u8, root_path),
         };
     }
 
@@ -151,7 +152,8 @@ pub const SnapshotService = struct {
 
     pub fn init(allocator: std.mem.Allocator, logger: ?*framework.Logger, store: *FileSnapshotStore) Self {
         return .{
-                        .logger = logger,
+            .allocator = allocator,
+            .logger = logger,
             .store = store,
         };
     }
@@ -211,7 +213,7 @@ fn findLatestForPath(records: []const SnapshotRecord, path: []const u8) ?Snapsho
 
 fn restoreRecord(allocator: std.mem.Allocator, root_path: []const u8, record: SnapshotRecord) !void {
     if (!record.existed_before) {
-        std.Io.Dir.cwd().deleteFile(record.path) catch |err| switch (err) {
+        std.Io.Dir.cwd().deleteFile(std.Io.Threaded.global_single_threaded.*.io(), record.path) catch |err| switch (err) {
             error.FileNotFound => {},
             else => return err,
         };

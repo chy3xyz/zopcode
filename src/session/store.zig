@@ -108,7 +108,8 @@ pub const FileSessionStore = struct {
     pub fn init(allocator: std.mem.Allocator, root_path: []const u8, event_bus: ?framework.EventBus, logger: ?*framework.Logger) !Self {
         _ = std.c.mkdir(@ptrCast(root_path.ptr), 0o755);
         return .{
-                        .root_path = try allocator.dupe(u8, root_path),
+            .allocator = allocator,
+            .root_path = try allocator.dupe(u8, root_path),
             .event_bus = event_bus,
             .logger = logger,
         };
@@ -140,12 +141,12 @@ pub const FileSessionStore = struct {
         const messages_path = try self.messagesPath(allocator, info.id);
         defer allocator.free(messages_path);
         const messages_file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), messages_path, .{ .truncate = false });
-        messages_file.close();
+        messages_file.close(std.Io.Threaded.global_single_threaded.*.io());
 
         const parts_path = try self.partsPath(allocator, info.id);
         defer allocator.free(parts_path);
         const parts_file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), parts_path, .{ .truncate = false });
-        parts_file.close();
+        parts_file.close(std.Io.Threaded.global_single_threaded.*.io());
 
         try session_events.publishSessionCreatedEvent(self.allocator, self.event_bus, .{
             .session_id = info.id,
@@ -698,12 +699,11 @@ fn ensureParentDirectory(path: []const u8) !void {
     }
 }
 
-fn openAppendFile(path: []const u8) !std.fs.File {
-    var file = std.Io.Dir.cwd().openFile(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .mode = .read_write }) catch |err| switch (err) {
+fn openAppendFile(path: []const u8) !std.Io.File {
+    const file = std.Io.Dir.cwd().openFile(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .mode = .read_write }) catch |err| switch (err) {
         error.FileNotFound => try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .read = true, .truncate = false }),
         else => return err,
     };
-    try file.seekFromEnd(0);
     return file;
 }
 

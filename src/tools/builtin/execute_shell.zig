@@ -49,7 +49,7 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
 
     const exit_code: u8 = switch (result.term) {
         .exited => |code| code,
-        .Signal, .Stopped, .Unknown => 1,
+        .signal, .stopped, .unknown => 1,
     };
     const success = exit_code == 0;
 

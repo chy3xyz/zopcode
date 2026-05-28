@@ -162,7 +162,8 @@ pub const AppContext = struct {
         const workspace_root_path = try std.fs.path.join(allocator, &.{ session_store.root_path, "_workspaces" });
         defer allocator.free(workspace_root_path);
         const project_runtime = try project.ProjectRuntime.init(.{
-                        .logger = framework_app.logger,
+            .allocator = allocator,
+            .logger = framework_app.logger,
             .current_dir = config_runtime.resolved_paths.current_dir,
             .workspace_root = workspace_root_path,
         });
@@ -176,7 +177,8 @@ pub const AppContext = struct {
         });
 
         const plugin_runtime = try plugin.PluginRuntime.init(.{
-                        .logger = framework_app.logger,
+            .allocator = allocator,
+            .logger = framework_app.logger,
             .current_dir = config_runtime.resolved_paths.current_dir,
         });
         errdefer {
@@ -186,7 +188,8 @@ pub const AppContext = struct {
         bootstrap_logger.info("plugin runtime initialized", &.{});
 
         const skill_runtime = try skill.SkillRuntime.init(.{
-                        .logger = framework_app.logger,
+            .allocator = allocator,
+            .logger = framework_app.logger,
             .current_dir = config_runtime.resolved_paths.current_dir,
         });
         errdefer {
@@ -213,7 +216,8 @@ pub const AppContext = struct {
         errdefer tool_registry.deinit();
 
         const formatter_runtime = try formatter.FormatterRuntime.init(.{
-                        .logger = framework_app.logger,
+            .allocator = allocator,
+            .logger = framework_app.logger,
             .workspace_dir = config_runtime.resolved_paths.current_dir,
             .formatter = effective_config.formatter,
         });
@@ -223,7 +227,8 @@ pub const AppContext = struct {
         }
 
         const lsp_runtime = try lsp.LspRuntime.init(.{
-                        .logger = framework_app.logger,
+            .allocator = allocator,
+            .logger = framework_app.logger,
             .event_bus = framework_app.eventBus(),
             .workspace_dir = config_runtime.resolved_paths.current_dir,
             .lsp = effective_config.lsp,
@@ -231,7 +236,8 @@ pub const AppContext = struct {
         errdefer lsp_runtime.deinit();
 
         const mcp_runtime = try mcp.McpRuntime.init(.{
-                        .logger = framework_app.logger,
+            .allocator = allocator,
+            .logger = framework_app.logger,
             .event_bus = framework_app.eventBus(),
             .workspace_dir = config_runtime.resolved_paths.current_dir,
             .mcp = effective_config.mcp,
@@ -242,7 +248,8 @@ pub const AppContext = struct {
         }
 
         const pty_runtime = try pty.PtyRuntime.init(.{
-                        .logger = framework_app.logger,
+            .allocator = allocator,
+            .logger = framework_app.logger,
             .event_bus = framework_app.eventBus(),
             .workspace_dir = config_runtime.resolved_paths.current_dir,
         });
@@ -252,14 +259,16 @@ pub const AppContext = struct {
         }
 
         const permission_runtime = try permission.PermissionRuntime.init(.{
-                        .logger = framework_app.logger,
+            .allocator = allocator,
+            .logger = framework_app.logger,
             .event_bus = framework_app.eventBus(),
             .rules = effective_config.permission.rules,
         });
         errdefer permission_runtime.deinit();
 
         const question_runtime = try question.QuestionRuntime.init(.{
-                        .logger = framework_app.logger,
+            .allocator = allocator,
+            .logger = framework_app.logger,
             .event_bus = framework_app.eventBus(),
         });
         errdefer question_runtime.deinit();
@@ -311,7 +320,8 @@ pub const AppContext = struct {
         const session_runtime = try allocator.create(session.SessionRuntime);
         errdefer allocator.destroy(session_runtime);
         session_runtime.* = session.SessionRuntime.init(.{
-                        .logger = framework_app.logger,
+            .allocator = allocator,
+            .logger = framework_app.logger,
             .task_runner = framework_app.task_runner,
             .event_bus = framework_app.eventBus(),
             .status_index = status_index,
@@ -331,7 +341,8 @@ pub const AppContext = struct {
         const loop_service = try allocator.create(loop.LoopService);
         errdefer allocator.destroy(loop_service);
         loop_service.* = loop.LoopService.init(.{
-                        .logger = framework_app.logger,
+            .allocator = allocator,
+            .logger = framework_app.logger,
             .event_bus = framework_app.eventBus(),
             .agent_registry = agent_registry,
             .session_runtime = session_runtime,
@@ -348,7 +359,8 @@ pub const AppContext = struct {
         const orchestration_service = try allocator.create(orchestration.OrchestrationService);
         errdefer allocator.destroy(orchestration_service);
         orchestration_service.* = orchestration.OrchestrationService.init(.{
-                        .logger = framework_app.logger,
+            .allocator = allocator,
+            .logger = framework_app.logger,
             .task_runner = framework_app.task_runner,
             .session_runtime = session_runtime,
             .session_store = session_store.asSessionStore(),
@@ -371,7 +383,8 @@ pub const AppContext = struct {
         });
 
         return .{
-                        .framework_app = framework_app,
+            .allocator = allocator,
+            .framework_app = framework_app,
             .config_runtime = config_runtime,
             .agent_registry = agent_registry,
             .provider_registry = provider_registry,

@@ -37,6 +37,7 @@ pub const PtyRuntime = struct {
         chunks: std.ArrayListUnmanaged(types.OutputChunk) = .empty,
         next_seq: u64 = 1,
         condition: std.Io.Condition = .init,
+        condition_mutex: std.Io.Mutex = undefined,
         removed: bool = false,
 
         fn deinit(self: *Record, allocator: std.mem.Allocator) void {
@@ -84,7 +85,7 @@ pub const PtyRuntime = struct {
         record.* = .{
             .info = .{
                 .id = pty_id,
-                .cwd = .{ .path = cwd },
+                .cwd = cwd,
                 .shell = shell_name,
                 .status = .running,
                 .created_at_ms = now,
@@ -204,8 +205,7 @@ pub const PtyRuntime = struct {
 
             const elapsed_ms: u64 = @intCast(@max(std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds() - started_at, 0));
             if (elapsed_ms >= follow_ms) break;
-            const wait_ms = follow_ms - elapsed_ms;
-            recordnull catch break;
+            record.condition.wait(std.Io.Threaded.global_single_threaded.*.io(), &record.condition_mutex) catch break;
         }
 
         var count: usize = 0;
@@ -258,17 +258,27 @@ pub const PtyRuntime = struct {
     fn publishStatus(self: *Self, pty_id: []const u8, status: types.StatusKind, exit_code: ?i32) !void {
         var out: std.ArrayListUnmanaged(u8) = .empty;
         defer out.deinit(self.allocator);
-            try out.appendSlice(allocator, "{\"pty_id\":");
-        try out.print(allocator, "{f}", .{std.json.fmt(pty_id, .{})});
-        try out.appendSlice(allocator, ",\"status\":");
-        try out.print(allocator, "{f}", .{std.json.fmt(status.asText(), .{})});
-        try out.appendSlice(allocator, ",\"exit_code\":");
-        if (exit_code) |code| {
-            try out.print(allocator, "{d}", .{code});
-        } else {
-            try out.appendSlice(allocator, "null");
+            try out.appendSlice(self.allocator, "{\"pty_id\":");
+        {
+            const s = try std.fmt.allocPrint(self.allocator, "{s}", .{pty_id});
+            defer self.allocator.free(s);
+            try out.appendSlice(self.allocator, s);
         }
-        try out.append(allocator, '}');
+        try out.appendSlice(self.allocator, ",\"status\":");
+        {
+            const s = try std.fmt.allocPrint(self.allocator, "{s}", .{status.asText()});
+            defer self.allocator.free(s);
+            try out.appendSlice(self.allocator, s);
+        }
+        try out.appendSlice(self.allocator, ",\"exit_code\":");
+        if (exit_code) |code| {
+            const s = try std.fmt.allocPrint(self.allocator, "{d}", .{code});
+            defer self.allocator.free(s);
+            try out.appendSlice(self.allocator, s);
+        } else {
+            try out.appendSlice(self.allocator, "null");
+        }
+        try out.append(self.allocator, '}');
         const payload = try self.allocator.dupe(u8, out.items);
         defer self.allocator.free(payload);
         _ = try self.event_bus.publish(PTY_STATUS_EVENT_TOPIC, payload);

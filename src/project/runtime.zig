@@ -175,7 +175,7 @@ pub const ProjectRuntime = struct {
         const path = try std.fs.path.join(self.allocator, &.{ self.workspace_root, workspace_id });
         defer self.allocator.free(path);
         std.Io.Dir.cwd().access(std.Io.Threaded.global_single_threaded.*.io(), path, .{}) catch return false;
-        try std.Io.Dir.cwd().deleteTree(path);
+        try std.Io.Dir.cwd().deleteTree(std.Io.Threaded.global_single_threaded.*.io(), path);
         return true;
     }
 

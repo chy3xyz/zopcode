@@ -18,7 +18,8 @@ pub const TerminalApp = struct {
 
     pub fn init(allocator: std.mem.Allocator, client: *zopcode.Client, options: TerminalOptions) !Self {
         var self = Self{
-                        .client = client,
+            .allocator = allocator,
+            .client = client,
             .view_model = try model.TerminalViewModel.init(allocator, options.max_event_lines),
             .subscription = try client.subscribeEvents(0),
         };

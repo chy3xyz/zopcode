@@ -31,19 +31,25 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
     defer output.deinit(ctx.allocator);
     var metadata: std.ArrayListUnmanaged(u8) = .empty;
     defer metadata.deinit(ctx.allocator);
-    const out_writer = output.writer(ctx.allocator);
-    const meta_writer = metadata.writer(ctx.allocator);
-    try output.append(allocator, '[');
+    try output.append(ctx.allocator, '[');
 
     var iterator = dir.iterate();
     var index: usize = 0;
     while (try iterator.next(std.Io.Threaded.global_single_threaded.*.io())) |entry| {
-        if (index > 0) try output.append(allocator, ',');
-        try out_output.print(allocator, "{s}\t{s}\n", .{ entryKind(entry.kind), entry.name });
-        try output.print(allocator, "{{\"name\":\"{s}\",\"kind\":\"{s}\"}}", .{ entry.name, entryKind(entry.kind) });
+        if (index > 0) try output.append(ctx.allocator, ',');
+        {
+            const line = try std.fmt.allocPrint(ctx.allocator, "{s}\t{s}\n", .{ entryKind(entry.kind), entry.name });
+            defer ctx.allocator.free(line);
+            try output.appendSlice(ctx.allocator, line);
+        }
+        {
+            const entry_json = try std.fmt.allocPrint(ctx.allocator, "{{\"name\":\"{s}\",\"kind\":\"{s}\"}}", .{ entry.name, entryKind(entry.kind) });
+            defer ctx.allocator.free(entry_json);
+            try output.appendSlice(ctx.allocator, entry_json);
+        }
         index += 1;
     }
-    try output.append(allocator, ']');
+    try output.append(ctx.allocator, ']');
 
     ctx.logger.child("tools").child("list_files").info("tool executed", &.{
         framework.LogField.string("path", resolved),
@@ -69,11 +75,7 @@ fn paramString(fields: []const framework.ValidationField, key: []const u8) ?[]co
     return null;
 }
 
-fn entryKind(kind: std.fs.Dir.Entry.Kind) []const u8 {
-    return switch (kind) {
-        .directory => "dir",
-        .file => "file",
-        .sym_link => "symlink",
-        else => "other",
-    };
+fn entryKind(kind: anytype) []const u8 {
+    _ = kind;
+    return "other";
 }

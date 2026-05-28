@@ -17,7 +17,7 @@ pub const QuestionRuntime = struct {
     logger: *framework.Logger,
     event_bus: framework.EventBus,
     next_id: u64 = 1,
-    mutex: std.atomic.Mutex = .unlocked,
+    mutex: std.Io.Mutex = undefined,
     condition: std.Io.Condition = .init,
     pending: std.ArrayListUnmanaged(*PendingEntry) = .empty,
 
@@ -46,7 +46,7 @@ pub const QuestionRuntime = struct {
 
     pub fn deinit(self: *Self) void {
         while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
-        defer self.mutex.unlock();
+        defer self.mutex.unlock(std.Io.Threaded.global_single_threaded.*.io());
         for (self.pending.items) |entry| {
             entry.deinit(self.allocator);
             self.allocator.destroy(entry);
@@ -73,7 +73,7 @@ pub const QuestionRuntime = struct {
 
         while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         try self.pending.append(self.allocator, entry);
-        self.mutex.unlock();
+        self.mutex.unlock(std.Io.Threaded.global_single_threaded.*.io());
 
         try publishAskedEvent(self.allocator, self.event_bus, entry.request);
         self.logger.child("question").info("question asked", &.{
@@ -86,7 +86,7 @@ pub const QuestionRuntime = struct {
 
     pub fn list(self: *Self, allocator: std.mem.Allocator) ![]types.QuestionRequest {
         while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
-        defer self.mutex.unlock();
+        defer self.mutex.unlock(std.Io.Threaded.global_single_threaded.*.io());
         const items = try allocator.alloc(types.QuestionRequest, self.pending.items.len);
         errdefer allocator.free(items);
         for (self.pending.items, 0..) |entry, index| {
@@ -98,7 +98,7 @@ pub const QuestionRuntime = struct {
 
     pub fn reply(self: *Self, request_id: []const u8, answers: []const types.QuestionAnswer) !bool {
         while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
-        defer self.mutex.unlock();
+        defer self.mutex.unlock(std.Io.Threaded.global_single_threaded.*.io());
         for (self.pending.items) |entry| {
             if (!std.mem.eql(u8, entry.request.id, request_id)) continue;
             const cloned = try self.allocator.alloc(types.QuestionAnswer, answers.len);
@@ -115,7 +115,7 @@ pub const QuestionRuntime = struct {
 
     pub fn reject(self: *Self, request_id: []const u8) !bool {
         while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
-        defer self.mutex.unlock();
+        defer self.mutex.unlock(std.Io.Threaded.global_single_threaded.*.io());
         for (self.pending.items) |entry| {
             if (!std.mem.eql(u8, entry.request.id, request_id)) continue;
             entry.rejected = true;
@@ -127,7 +127,7 @@ pub const QuestionRuntime = struct {
 
     pub fn waitForAnswer(self: *Self, request_id: []const u8, session_id: []const u8) ![]types.QuestionAnswer {
         while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
-        defer self.mutex.unlock();
+        defer self.mutex.unlock(std.Io.Threaded.global_single_threaded.*.io());
         while (true) {
             if (findPendingLocked(self, request_id)) |entry| {
                 if (entry.rejected) {
@@ -154,7 +154,7 @@ pub const QuestionRuntime = struct {
             } else {
                 return error.QuestionRequestMissing;
             }
-            self.condition.wait(&self.mutex);
+            try self.condition.wait(std.Io.Threaded.global_single_threaded.*.io(), &self.mutex);
         }
     }
 
@@ -176,7 +176,7 @@ pub const QuestionRuntime = struct {
 
     fn nextRequestId(self: *Self) u64 {
         while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
-        defer self.mutex.unlock();
+        defer self.mutex.unlock(std.Io.Threaded.global_single_threaded.*.io());
         const value = self.next_id;
         self.next_id += 1;
         return value;

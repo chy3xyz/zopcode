@@ -211,11 +211,15 @@ fn buildSummaryText(allocator: std.mem.Allocator, items: []const history_model.M
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
 
-    try list.print(allocator, "Compacted {d} earlier message(s):", .{items.len});
+    {
+        const msg = try std.fmt.allocPrint(allocator, "Compacted {d} earlier message(s):", .{items.len});
+        defer allocator.free(msg);
+        try out.appendSlice(allocator, msg);
+    }
     for (items) |message| {
-        try list.appendSlice(allocator, "\n- ");
-        try list.appendSlice(allocator, message.info.role.asText());
-        try list.appendSlice(allocator, ": ");
+        try out.appendSlice(allocator, "\n- ");
+        try out.appendSlice(allocator, message.info.role.asText());
+        try out.appendSlice(allocator, ": ");
         var wrote_any = false;
         for (message.parts) |part| {
             switch (part) {
@@ -228,11 +232,19 @@ fn buildSummaryText(allocator: std.mem.Allocator, items: []const history_model.M
                     wrote_any = true;
                 },
                 .tool_call => |value| {
-                    try list.print(allocator, "[tool_call {s}]", .{value.tool_name});
+                    {
+                        const msg = try std.fmt.allocPrint(allocator, "[tool_call {s}]", .{value.tool_name});
+                        defer allocator.free(msg);
+                        try out.appendSlice(allocator, msg);
+                    }
                     wrote_any = true;
                 },
                 .tool_result => |value| {
-                    try list.print(allocator, "[tool_result {s}]", .{value.tool_name});
+                    {
+                        const msg = try std.fmt.allocPrint(allocator, "[tool_result {s}]", .{value.tool_name});
+                        defer allocator.free(msg);
+                        try out.appendSlice(allocator, msg);
+                    }
                     wrote_any = true;
                 },
                 .system_reminder => |value| {
@@ -254,16 +266,16 @@ fn buildSummaryText(allocator: std.mem.Allocator, items: []const history_model.M
             }
             if (wrote_any) break;
         }
-        if (!wrote_any) try list.appendSlice(allocator, "(no content)");
+        if (!wrote_any) try out.appendSlice(allocator, "(no content)");
     }
 
     return allocator.dupe(u8, out.items);
 }
 
-fn writeTruncated(writer: anytype, text: []const u8, max_len: usize) !void {
+fn writeTruncated(out: anytype, allocator: std.mem.Allocator, text: []const u8, max_len: usize) !void {
     const slice = if (text.len > max_len) text[0..max_len] else text;
-    try list.appendSlice(allocator, slice);
-    if (text.len > max_len) try list.appendSlice(allocator, "...");
+    try out.appendSlice(allocator, slice);
+    if (text.len > max_len) try out.appendSlice(allocator, "...");
 }
 
 test "disabled compaction policy does not require compaction" {

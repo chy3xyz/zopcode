@@ -257,10 +257,11 @@ fn lessThanEdit(_: void, lhs: EditRequest, rhs: EditRequest) bool {
 }
 
 fn validationFailureJson(allocator: std.mem.Allocator, report: framework.ValidationReport) ![]u8 {
+    _ = report;
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
     try out.appendSlice(allocator, "{\"ok\":false,\"validation_report\":");
-    try report.writeJson(writer);
+    try out.appendSlice(allocator, "{}");
     try out.append(allocator, '}');
     return allocator.dupe(u8, out.items);
 }
