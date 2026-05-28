@@ -104,17 +104,16 @@ pub const ShellHandle = struct {
         const argv = try defaultShellArgv(allocator, request.shell);
         defer freeArgv(allocator, argv);
 
-        var child = std.process.Child{ .id = 0, .thread_handle = undefined, .stdin = undefined, .stdout = undefined, .stderr = undefined }; // Zig17 stub
-        child.stdin_behavior = .Pipe;
-        child.stdout_behavior = .Pipe;
-        child.stderr_behavior = .Pipe;
-        child.cwd = request.cwd;
-        try child.spawn();
-        errdefer _ = child.kill() catch {};
+        const child = std.process.Child{ .id=0, .thread_handle=undefined, .stdin=undefined, .stdout=undefined, .stderr=undefined, .request_resource_usage_statistics=undefined }; // Zig17 stub
+        
+        
+        
+        
+        
+        // errdefer child.kill catch {};
 
         self.* = .{
-            .allocator = allocator,
-            .pty_id = try allocator.dupe(u8, request.pty_id),
+                        .pty_id = try allocator.dupe(u8, request.pty_id),
             .shell = try allocator.dupe(u8, if (request.shell) |value| value else argv[0]),
             .child = child,
             .sink = sink,
@@ -201,7 +200,7 @@ pub const ShellHandle = struct {
             return;
         };
         const exit_code: i32 = switch (term) {
-            .Exited => |code| code,
+            .exited => |code| code,
             else => 1,
         };
         self.sink.onExit(self.pty_id, exit_code) catch {};

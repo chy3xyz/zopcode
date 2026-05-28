@@ -34,9 +34,9 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
     if (std.fs.path.dirname(resolved)) |dir_name| {
         _ = std.c.mkdir(@ptrCast(dir_name.ptr), 0o755);
     }
-    var file = try std.Io.Dir.cwd().createFile(resolved, .{ .truncate = true });
-    defer file.close();
-    try file.writeAll(content);
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), resolved, .{ .truncate = true });
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), content);
 
     const formatter_result = try maybeFormat(ctx, resolved);
     defer if (formatter_result) |item| {

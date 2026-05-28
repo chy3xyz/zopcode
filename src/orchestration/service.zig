@@ -357,12 +357,11 @@ fn injectBatchIdIntoChildrenJson(allocator: std.mem.Allocator, batch_id: []const
 
     var buf: std.ArrayListUnmanaged(u8) = .empty;
     defer buf.deinit(allocator);
-    const writer = buf.writer(allocator);
-    try writer.writeAll("{\"batch_id\":");
-    try writer.print("{f}", .{std.json.fmt(batch_id, .{})});
-    try writer.writeAll(",\"children\":");
-    try writer.print("{f}", .{std.json.fmt(children_value, .{})});
-    try writer.writeByte('}');
+    try buf.appendSlice(allocator, "{\"batch_id\":");
+    try buf.print(allocator, "{f}", .{std.json.fmt(batch_id, .{})});
+    try buf.appendSlice(allocator, ",\"children\":");
+    try buf.print(allocator, "{f}", .{std.json.fmt(children_value, .{})});
+    try buf.append(allocator, '}');
     return allocator.dupe(u8, buf.items);
 }
 
@@ -669,9 +668,9 @@ fn makeOrchestrationFixture(allocator: std.mem.Allocator) !OrchestrationFixture 
     const global_path = try std.fs.path.join(allocator, &.{ root_path, "missing-global.json" });
     errdefer allocator.free(global_path);
 
-    var file = try std.Io.Dir.cwd().createFile(config_path, .{});
-    defer file.close();
-    try file.writeAll(
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), config_path, .{});
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), 
         \\{
         \\  "agent": { "default": "build" },
         \\  "session": { "store": { "path": "sessions" } },
@@ -743,8 +742,7 @@ const MockProvider = struct {
     fn createClient(allocator: std.mem.Allocator, ctx: provider.ProviderRegistry.ProviderCreateContext) anyerror!provider.ProviderClient {
         const client = try allocator.create(MockClient);
         client.* = .{
-            .allocator = allocator,
-            .logger = ctx.logger,
+                        .logger = ctx.logger,
             .event_bus = ctx.event_bus,
         };
         return client.asProviderClient();

@@ -22,39 +22,38 @@ pub const ToolResult = struct {
     pub fn toJson(self: ToolResult, allocator: std.mem.Allocator) ![]u8 {
         var buf: std.ArrayListUnmanaged(u8) = .empty;
         defer buf.deinit(allocator);
-        const writer = buf.writer(allocator);
-
-        try writer.writeAll("{\"title\":");
-        try writeJsonString(writer, self.title);
-        try writer.writeAll(",\"output_text\":");
-        try writeJsonString(writer, self.output_text);
-        try writer.writeAll(",\"metadata\":");
-        try writer.writeAll(self.metadata_json);
-        try writer.writeByte('}');
+    
+        try buf.appendSlice(allocator, "{\"title\":");
+        try writeJsonString(&buf, allocator, self.title);
+        try buf.appendSlice(allocator, ",\"output_text\":");
+        try writeJsonString(&buf, allocator, self.output_text);
+        try buf.appendSlice(allocator, ",\"metadata\":");
+        try buf.appendSlice(allocator, self.metadata_json);
+        try buf.append(allocator, '}');
 
         return allocator.dupe(u8, buf.items);
     }
 };
 
 fn writeJsonString(writer: anytype, value: []const u8) !void {
-    try writer.writeByte('"');
+    try buf.append(allocator, '"');
     for (value) |ch| {
         switch (ch) {
-            '"' => try writer.writeAll("\\\""),
-            '\\' => try writer.writeAll("\\\\"),
-            '\n' => try writer.writeAll("\\n"),
-            '\r' => try writer.writeAll("\\r"),
-            '\t' => try writer.writeAll("\\t"),
+            '"' => try buf.appendSlice(allocator, "\\\""),
+            '\\' => try buf.appendSlice(allocator, "\\\\"),
+            '\n' => try buf.appendSlice(allocator, "\\n"),
+            '\r' => try buf.appendSlice(allocator, "\\r"),
+            '\t' => try buf.appendSlice(allocator, "\\t"),
             else => {
                 if (ch < 32) {
-                    try writer.print("\\u00{x:0>2}", .{ch});
+                    try buf.print(allocator, "\\u00{x:0>2}", .{ch});
                 } else {
-                    try writer.writeByte(ch);
+                    try buf.append(allocator, ch);
                 }
             },
         }
     }
-    try writer.writeByte('"');
+    try buf.append(allocator, '"');
 }
 
 test "tool result serializes to json" {

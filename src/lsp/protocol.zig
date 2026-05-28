@@ -61,13 +61,13 @@ test "protocol writes and reads content-length framed messages" {
     defer std.testing.allocator.free(file_path);
 
     {
-        var file = try std.Io.Dir.cwd().createFile(file_path, .{ .truncate = true });
-        defer file.close();
+        var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), file_path, .{ .truncate = true });
+        defer file.close(std.Io.Threaded.global_single_threaded.*.io());
         try writeMessage(file, "{\"jsonrpc\":\"2.0\"}");
     }
 
-    var file = try std.Io.Dir.cwd().openFile(file_path, .{ .mode = .read_only });
-    defer file.close();
+    var file = try std.Io.Dir.cwd().openFile(std.Io.Threaded.global_single_threaded.*.io(), file_path, .{ .mode = .read_only });
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
     const body = try readMessageAlloc(std.testing.allocator, file);
     defer std.testing.allocator.free(body);
     try std.testing.expectEqualStrings("{\"jsonrpc\":\"2.0\"}", body);

@@ -1033,8 +1033,7 @@ const MockLoopProvider = struct {
     fn createClient(allocator: std.mem.Allocator, ctx: provider.ProviderRegistry.ProviderCreateContext) anyerror!provider.ProviderClient {
         const client = try allocator.create(MockClient);
         client.* = .{
-            .allocator = allocator,
-            .logger = ctx.logger,
+                        .logger = ctx.logger,
             .event_bus = ctx.event_bus,
         };
         return client.asProviderClient();

@@ -58,8 +58,7 @@ pub const ToolRuntime = struct {
         working_dir: []const u8,
     ) !Self {
         var self = Self{
-            .allocator = allocator,
-            .registry = registry,
+                        .registry = registry,
             .logger = logger,
             .task_runner = task_runner,
             .event_bus = event_bus,
@@ -338,32 +337,31 @@ fn buildPluginHookPayload(
 ) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.writeAll("{\"hook\":");
-    try writer.writeByte('"');
-    try writeJsonStringFragment(writer, hook_name);
-    try writer.writeByte('"');
-    try writer.writeAll(",\"tool\":");
-    try writer.writeByte('"');
-    try writeJsonStringFragment(writer, tool_id);
-    try writer.writeByte('"');
-    try writer.writeAll(",\"request_id\":");
-    try writer.writeByte('"');
-    try writeJsonStringFragment(writer, request_id);
-    try writer.writeByte('"');
+    try out.appendSlice(allocator, "{\"hook\":");
+    try out.append(allocator, '"');
+    try writeJsonStringFragment(&out, allocator, hook_name);
+    try out.append(allocator, '"');
+    try out.appendSlice(allocator, ",\"tool\":");
+    try out.append(allocator, '"');
+    try writeJsonStringFragment(&out, allocator, tool_id);
+    try out.append(allocator, '"');
+    try out.appendSlice(allocator, ",\"request_id\":");
+    try out.append(allocator, '"');
+    try writeJsonStringFragment(&out, allocator, request_id);
+    try out.append(allocator, '"');
     if (session_id) |value| {
-        try writer.writeAll(",\"session_id\":");
-        try writer.writeByte('"');
-        try writeJsonStringFragment(writer, value);
-        try writer.writeByte('"');
+        try out.appendSlice(allocator, ",\"session_id\":");
+        try out.append(allocator, '"');
+        try writeJsonStringFragment(&out, allocator, value);
+        try out.append(allocator, '"');
     }
     if (outcome) |value| {
-        try writer.writeAll(",\"outcome\":");
-        try writer.writeByte('"');
-        try writeJsonStringFragment(writer, value);
-        try writer.writeByte('"');
+        try out.appendSlice(allocator, ",\"outcome\":");
+        try out.append(allocator, '"');
+        try writeJsonStringFragment(&out, allocator, value);
+        try out.append(allocator, '"');
     }
-    try writer.writeByte('}');
+    try out.append(allocator, '}');
     return allocator.dupe(u8, out.items);
 }
 
@@ -395,50 +393,49 @@ fn fieldString(fields: []const framework.ValidationField, key: []const u8) ?[]co
 fn buildPermissionMetadata(allocator: std.mem.Allocator, tool_id: []const u8, fields: []const framework.ValidationField) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.writeAll("{\"tool\":\"");
-    try writeJsonStringFragment(writer, tool_id);
-    try writer.writeAll("\",\"params\":{");
+    try out.appendSlice(allocator, "{\"tool\":\"");
+    try writeJsonStringFragment(&out, allocator, tool_id);
+    try out.appendSlice(allocator, "\",\"params\":{");
     for (fields, 0..) |field, index| {
-        if (index > 0) try writer.writeByte(',');
-        try writer.writeByte('"');
-        try writeJsonStringFragment(writer, field.key);
-        try writer.writeAll("\":");
+        if (index > 0) try out.append(allocator, ',');
+        try out.append(allocator, '"');
+        try writeJsonStringFragment(&out, allocator, field.key);
+        try out.appendSlice(allocator, "\":");
         try writeValidationValueJson(writer, field.value);
     }
-    try writer.writeAll("}}");
+    try out.appendSlice(allocator, "}}");
     return allocator.dupe(u8, out.items);
 }
 
 fn writeValidationValueJson(writer: anytype, value: framework.ValidationValue) !void {
     switch (value) {
         .string => |text| {
-            try writer.writeByte('"');
-            try writeJsonStringFragment(writer, text);
-            try writer.writeByte('"');
+            try out.append(allocator, '"');
+            try writeJsonStringFragment(&out, allocator, text);
+            try out.append(allocator, '"');
         },
-        .integer => |number| try writer.print("{d}", .{number}),
-        .boolean => |flag| try writer.writeAll(if (flag) "true" else "false"),
-        .float => |number| try writer.print("{d}", .{number}),
-        .null => try writer.writeAll("null"),
+        .integer => |number| try out.print(allocator, "{d}", .{number}),
+        .boolean => |flag| try out.appendSlice(allocator, if (flag) "true" else "false"),
+        .float => |number| try out.print(allocator, "{d}", .{number}),
+        .null => try out.appendSlice(allocator, "null"),
         .object => |fields| {
-            try writer.writeByte('{');
+            try out.append(allocator, '{');
             for (fields, 0..) |field, index| {
-                if (index > 0) try writer.writeByte(',');
-                try writer.writeByte('"');
-                try writeJsonStringFragment(writer, field.key);
-                try writer.writeAll("\":");
+                if (index > 0) try out.append(allocator, ',');
+                try out.append(allocator, '"');
+                try writeJsonStringFragment(&out, allocator, field.key);
+                try out.appendSlice(allocator, "\":");
                 try writeValidationValueJson(writer, field.value);
             }
-            try writer.writeByte('}');
+            try out.append(allocator, '}');
         },
         .array => |items| {
-            try writer.writeByte('[');
+            try out.append(allocator, '[');
             for (items, 0..) |item, index| {
-                if (index > 0) try writer.writeByte(',');
+                if (index > 0) try out.append(allocator, ',');
                 try writeValidationValueJson(writer, item);
             }
-            try writer.writeByte(']');
+            try out.append(allocator, ']');
         },
     }
 }
@@ -446,16 +443,16 @@ fn writeValidationValueJson(writer: anytype, value: framework.ValidationValue) !
 fn writeJsonStringFragment(writer: anytype, value: []const u8) !void {
     for (value) |ch| {
         switch (ch) {
-            '"' => try writer.writeAll("\\\""),
-            '\\' => try writer.writeAll("\\\\"),
-            '\n' => try writer.writeAll("\\n"),
-            '\r' => try writer.writeAll("\\r"),
-            '\t' => try writer.writeAll("\\t"),
+            '"' => try out.appendSlice(allocator, "\\\""),
+            '\\' => try out.appendSlice(allocator, "\\\\"),
+            '\n' => try out.appendSlice(allocator, "\\n"),
+            '\r' => try out.appendSlice(allocator, "\\r"),
+            '\t' => try out.appendSlice(allocator, "\\t"),
             else => {
                 if (ch < 32) {
-                    try writer.print("\\u00{x:0>2}", .{ch});
+                    try out.print(allocator, "\\u00{x:0>2}", .{ch});
                 } else {
-                    try writer.writeByte(ch);
+                    try out.append(allocator, ch);
                 }
             },
         }

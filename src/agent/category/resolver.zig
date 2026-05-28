@@ -11,8 +11,7 @@ pub const CategoryResolver = struct {
 
     pub fn init(allocator: std.mem.Allocator, registry: *const provider.ProviderRegistry) Self {
         return .{
-            .allocator = allocator,
-            .registry = registry,
+                        .registry = registry,
         };
     }
 

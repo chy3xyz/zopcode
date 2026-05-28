@@ -46,8 +46,7 @@ pub const TerminalViewModel = struct {
 
     pub fn init(allocator: std.mem.Allocator, max_event_lines: usize) !Self {
         return .{
-            .allocator = allocator,
-            .status = try allocator.dupe(u8, "idle"),
+                        .status = try allocator.dupe(u8, "idle"),
             .max_event_lines = max_event_lines,
         };
     }

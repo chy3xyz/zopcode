@@ -65,8 +65,7 @@ pub const AnthropicClient = struct {
             try auth.loadAnthropicApiKey(allocator);
         const endpoint = try allocator.dupe(u8, "https://api.anthropic.com/v1/messages");
         return .{
-            .allocator = allocator,
-            .logger = logger,
+                        .logger = logger,
             .event_bus = event_bus,
             .api_key = api_key,
             .endpoint = endpoint,

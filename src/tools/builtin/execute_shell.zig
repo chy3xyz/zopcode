@@ -48,7 +48,7 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
     }
 
     const exit_code: u8 = switch (result.term) {
-        .Exited => |code| code,
+        .exited => |code| code,
         .Signal, .Stopped, .Unknown => 1,
     };
     const success = exit_code == 0;
@@ -69,7 +69,7 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
             try ctx.allocator.dupe(u8, result.stderr),
         .metadata_json = try json.stringifyAlloc(ctx.allocator, .{
             .command = command,
-            .cwd = cwd,
+            .cwd = .{ .path = cwd },
             .exitCode = exit_code,
             .stderr = result.stderr,
         }),
@@ -84,7 +84,7 @@ fn runShell(allocator: std.mem.Allocator, cwd: []const u8, command: []const u8) 
 
     return std.process.run(allocator, std.Io.Threaded.global_single_threaded.*.io(), .{
         .argv = argv,
-        .cwd = cwd,
+        .cwd = .{ .path = cwd },
         .stdout_limit = .limited(512 * 1024), .stderr_limit = .limited(512 * 1024)
     });
 }

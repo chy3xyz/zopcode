@@ -152,9 +152,9 @@ test "skill runtime discovers local skills and can load markdown" {
     _ = std.c.mkdir(@ptrCast(skill_dir.ptr), 0o755);
     const skill_path = try std.fs.path.join(std.testing.allocator, &.{ skill_dir, "SKILL.md" });
     defer std.testing.allocator.free(skill_path);
-    var file = try std.Io.Dir.cwd().createFile(skill_path, .{ .truncate = true });
-    defer file.close();
-    try file.writeAll("# Demo Skill\nA sample skill.");
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), skill_path, .{ .truncate = true });
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "# Demo Skill\nA sample skill.");
 
     var memory_sink = framework.MemorySink.init(std.testing.allocator, 16);
     defer memory_sink.deinit();

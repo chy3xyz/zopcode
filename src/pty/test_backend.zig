@@ -51,8 +51,7 @@ fn spawn(ptr: *anyopaque, allocator: std.mem.Allocator, request: backend.SpawnRe
     state.pty_id = request.pty_id;
     const handle = try allocator.create(MockHandle);
     handle.* = .{
-        .allocator = allocator,
-        .state = state,
+                .state = state,
     };
     return handle.asHandle();
 }

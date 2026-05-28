@@ -75,9 +75,9 @@ test "loader can parse nested json config into flat fields" {
     const config_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "zopcode.json" });
     defer std.testing.allocator.free(config_path);
 
-    var file = try std.Io.Dir.cwd().createFile(config_path, .{});
-    defer file.close();
-    try file.writeAll(
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), config_path, .{});
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), 
         \\{
         \\  "model": { "default": "anthropic/claude-sonnet-4-5" },
         \\  "server": { "port": 9191 }

@@ -21,8 +21,7 @@ pub const ServerServices = struct {
 
     pub fn init(allocator: std.mem.Allocator, app_context: *app_context_model.AppContext) Self {
         return .{
-            .allocator = allocator,
-            .app_context = app_context,
+                        .app_context = app_context,
         };
     }
 
@@ -638,9 +637,9 @@ pub fn makeServerFixture(allocator: std.mem.Allocator) !ServerFixture {
     const global_path = try std.fs.path.join(allocator, &.{ root_path, "missing-global.json" });
     errdefer allocator.free(global_path);
 
-    var file = try std.Io.Dir.cwd().createFile(config_path, .{});
-    defer file.close();
-    try file.writeAll(
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), config_path, .{});
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), 
         \\{
         \\  "agent": { "default": "build" },
         \\  "mcp": { "servers": [

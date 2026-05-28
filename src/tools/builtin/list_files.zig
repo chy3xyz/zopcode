@@ -25,7 +25,7 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
     defer ctx.allocator.free(resolved);
 
     var dir = try std.Io.Dir.cwd().openDir(std.Io.Threaded.global_single_threaded.*.io(), resolved, .{ .iterate = true });
-    defer dir.close();
+    defer dir.close(std.Io.Threaded.global_single_threaded.*.io());
 
     var output: std.ArrayListUnmanaged(u8) = .empty;
     defer output.deinit(ctx.allocator);
@@ -37,7 +37,7 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
 
     var iterator = dir.iterate();
     var index: usize = 0;
-    while (try iterator.next()) |entry| {
+    while (try iterator.next(std.Io.Threaded.global_single_threaded.*.io())) |entry| {
         if (index > 0) try output.append(allocator, ',');
         try out_output.print(allocator, "{s}\t{s}\n", .{ entryKind(entry.kind), entry.name });
         try output.print(allocator, "{{\"name\":\"{s}\",\"kind\":\"{s}\"}}", .{ entry.name, entryKind(entry.kind) });

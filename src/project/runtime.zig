@@ -117,11 +117,11 @@ pub const ProjectRuntime = struct {
     }
 
     pub fn listWorkspaces(self: *Self, allocator: std.mem.Allocator) ![]types.WorkspaceInfo {
-        var dir = std.Io.Dir.cwd().openDir(self.workspace_root, .{ .iterate = true }) catch |err| switch (err) {
+        var dir = std.Io.Dir.cwd().openDir(std.Io.Threaded.global_single_threaded.*.io(), self.workspace_root, .{ .iterate = true }) catch |err| switch (err) {
             error.FileNotFound => return allocator.alloc(types.WorkspaceInfo, 0),
             else => return err,
         };
-        defer dir.close();
+        defer dir.close(std.Io.Threaded.global_single_threaded.*.io());
 
         var items: std.ArrayListUnmanaged(types.WorkspaceInfo) = .empty;
         errdefer {
@@ -130,11 +130,11 @@ pub const ProjectRuntime = struct {
         }
 
         var it = dir.iterate();
-        while (try it.next()) |entry| {
+        while (try it.next(std.Io.Threaded.global_single_threaded.*.io())) |entry| {
             if (entry.kind != .directory) continue;
             const meta_path = try std.fs.path.join(allocator, &.{ self.workspace_root, entry.name, "workspace.json" });
             defer allocator.free(meta_path);
-            const contents = std.Io.Dir.cwd().readFileAlloc(allocator, meta_path, 1024 * 1024) catch |err| switch (err) {
+            const contents = std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), meta_path, allocator, .limited(1024 * 1024)) catch |err| switch (err) {
                 error.FileNotFound => continue,
                 else => return err,
             };
@@ -262,11 +262,10 @@ fn workspaceInfoFromJson(allocator: std.mem.Allocator, value: WorkspaceInfoJson)
 fn writeJsonFile(allocator: std.mem.Allocator, path: []const u8, value: anytype) !void {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.print("{f}", .{std.json.fmt(value, .{})});
-    var file = try std.Io.Dir.cwd().createFile(path, .{ .truncate = true });
-    defer file.close();
-    try file.writeAll(out.items);
+    try out.print(allocator, "{f}", .{std.json.fmt(value, .{})});
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .truncate = true });
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), out.items);
 }
 
 fn nextWorkspaceId(allocator: std.mem.Allocator) ![]u8 {

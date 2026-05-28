@@ -14,8 +14,7 @@ pub const ToolingBridge = struct {
         errdefer allocator.destroy(self);
 
         self.* = .{
-            .allocator = allocator,
-            .effects_runtime = framework.EffectsRuntime.init(.{}),
+                        .effects_runtime = framework.EffectsRuntime.init(.{}),
             .registry = framework.ToolRegistry.init(allocator),
             .tooling_runtime = undefined,
         };
@@ -24,8 +23,7 @@ pub const ToolingBridge = struct {
         try self.registry.register(framework.defineTool(framework.RepoHealthCheckTool));
 
         self.tooling_runtime = try framework.ToolingRuntime.init(.{
-            .allocator = allocator,
-            .app_context = app_context,
+                        .app_context = app_context,
             .effects = &self.effects_runtime,
             .registry = &self.registry,
         });

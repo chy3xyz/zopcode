@@ -67,9 +67,9 @@ test "server config matches extensions and resolves roots" {
 
     const marker_path = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "build.zig" });
     defer std.testing.allocator.free(marker_path);
-    var marker_file = try std.Io.Dir.cwd().createFile(marker_path, .{});
-    defer marker_file.close();
-    try marker_file.writeAll("test");
+    var marker_file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), marker_path, .{});
+    defer marker_file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try marker_file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "test");
 
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ nested_dir, "main.zig" });
     defer std.testing.allocator.free(file_path);

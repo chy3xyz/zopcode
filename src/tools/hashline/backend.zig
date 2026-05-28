@@ -95,9 +95,9 @@ fn applyToPath(allocator: std.mem.Allocator, path: []const u8, edits: []const Ed
 
     const rendered = try joinLines(allocator, line_list.items, original.len > 0 and original[original.len - 1] == '\n');
     defer allocator.free(rendered);
-    var file = try std.Io.Dir.cwd().createFile(path, .{ .truncate = true });
-    defer file.close();
-    try file.writeAll(rendered);
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .truncate = true });
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), rendered);
 
     return json.stringifyAlloc(allocator, .{
         .ok = true,
@@ -192,12 +192,11 @@ fn freeOwnedLines(allocator: std.mem.Allocator, lines: *std.ArrayListUnmanaged([
 fn joinLines(allocator: std.mem.Allocator, lines: []const []const u8, trailing_newline: bool) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
     for (lines, 0..) |line, index| {
-        if (index > 0) try writer.writeByte('\n');
-        try writer.writeAll(line);
+        if (index > 0) try out.append(allocator, '\n');
+        try out.appendSlice(allocator, line);
     }
-    if (trailing_newline) try writer.writeByte('\n');
+    if (trailing_newline) try out.append(allocator, '\n');
     return allocator.dupe(u8, out.items);
 }
 
@@ -260,10 +259,9 @@ fn lessThanEdit(_: void, lhs: EditRequest, rhs: EditRequest) bool {
 fn validationFailureJson(allocator: std.mem.Allocator, report: framework.ValidationReport) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.writeAll("{\"ok\":false,\"validation_report\":");
+    try out.appendSlice(allocator, "{\"ok\":false,\"validation_report\":");
     try report.writeJson(writer);
-    try writer.writeByte('}');
+    try out.append(allocator, '}');
     return allocator.dupe(u8, out.items);
 }
 
@@ -276,9 +274,9 @@ test "hashline backend applies anchored replace successfully" {
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "sample.txt" });
     defer std.testing.allocator.free(file_path);
     {
-        var file = try std.Io.Dir.cwd().createFile(file_path, .{});
-        defer file.close();
-        try file.writeAll("alpha\nbeta\n");
+        var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), file_path, .{});
+        defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+        try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "alpha\nbeta\n");
     }
 
     const anchor_text = try anchor.formatAnchor(std.testing.allocator, 2, "beta");

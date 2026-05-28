@@ -108,8 +108,7 @@ pub const FileSessionStore = struct {
     pub fn init(allocator: std.mem.Allocator, root_path: []const u8, event_bus: ?framework.EventBus, logger: ?*framework.Logger) !Self {
         _ = std.c.mkdir(@ptrCast(root_path.ptr), 0o755);
         return .{
-            .allocator = allocator,
-            .root_path = try allocator.dupe(u8, root_path),
+                        .root_path = try allocator.dupe(u8, root_path),
             .event_bus = event_bus,
             .logger = logger,
         };
@@ -663,7 +662,7 @@ fn appendJsonLine(allocator: std.mem.Allocator, path: []const u8, value: anytype
     try ensureParentDirectory(path);
     var file = try openAppendFile(path);
     defer file.close(std.Io.Threaded.global_single_threaded.*.io());
-    try file.writeAll(rendered.items);
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), rendered.items);
 }
 
 fn writeJsonFile(allocator: std.mem.Allocator, path: []const u8, value: anytype) !void {
@@ -675,7 +674,7 @@ fn writeJsonFile(allocator: std.mem.Allocator, path: []const u8, value: anytype)
     try ensureParentDirectory(path);
     var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .truncate = true });
     defer file.close(std.Io.Threaded.global_single_threaded.*.io());
-    try file.writeAll(rendered.items);
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), rendered.items);
 }
 
 fn writeMessagesFile(allocator: std.mem.Allocator, path: []const u8, messages: []const message_model.MessageInfo) !void {
@@ -690,7 +689,7 @@ fn writeMessagesFile(allocator: std.mem.Allocator, path: []const u8, messages: [
     try ensureParentDirectory(path);
     var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .truncate = true });
     defer file.close(std.Io.Threaded.global_single_threaded.*.io());
-    try file.writeAll(rendered.items);
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), rendered.items);
 }
 
 fn ensureParentDirectory(path: []const u8) !void {

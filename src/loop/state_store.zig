@@ -41,8 +41,7 @@ pub const FileLoopStateStore = struct {
     pub fn init(allocator: std.mem.Allocator, root_path: []const u8) !Self {
         _ = std.c.mkdir(@ptrCast(root_path.ptr), 0o755);
         return .{
-            .allocator = allocator,
-            .root_path = try allocator.dupe(u8, root_path),
+                        .root_path = try allocator.dupe(u8, root_path),
         };
     }
 
@@ -90,7 +89,7 @@ pub const FileLoopStateStore = struct {
         defer self.mutex.unlock();
 
         const io = std.Io.Threaded.global_single_threaded.*.io();
-        var dir = std.Io.Dir.cwd().openDir(io, self.root_path, .{ .iterate = true }) catch |err| switch (err) {
+        var dir = std.Io.Dir.cwd().openDir(std.Io.Threaded.global_single_threaded.*.io(), io, self.root_path, .{ .iterate = true }) catch |err| switch (err) {
             error.FileNotFound => return allocator.alloc(types.LoopState, 0),
             else => return err,
         };
@@ -241,7 +240,7 @@ fn writeJsonFile(allocator: std.mem.Allocator, path: []const u8, value: anytype)
         _ = std.c.mkdir(@ptrCast(dir_name.ptr), 0o755);
     }
     const io = std.Io.Threaded.global_single_threaded.*.io();
-    var file = try std.Io.Dir.cwd().createFile(io, path, .{ .truncate = true });
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), io, path, .{ .truncate = true });
     defer file.close(io);
     try file.writeStreamingAll(io, rendered.items);
 }

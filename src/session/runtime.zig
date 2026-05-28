@@ -545,8 +545,7 @@ const OwnedModelRef = struct {
 
     fn init(allocator: std.mem.Allocator, provider_id: []const u8, model_id: []const u8) !OwnedModelRef {
         return .{
-            .allocator = allocator,
-            .value = .{
+                        .value = .{
                 .provider_id = try allocator.dupe(u8, provider_id),
                 .model_id = try allocator.dupe(u8, model_id),
             },
@@ -705,8 +704,7 @@ const ToolTaskJobData = struct {
         defer freeValidationFields(allocator, params);
 
         const command_ctx = framework.CommandContext{
-            .allocator = allocator,
-            .request = .{
+                        .request = .{
                 .request_id = self.task.request_id,
                 .trace_id = self.task.trace_id,
                 .source = .service,
@@ -786,19 +784,18 @@ fn renderProviderMessages(allocator: std.mem.Allocator, messages: []const histor
 fn renderConversationMessage(allocator: std.mem.Allocator, message: history_model.ConversationMessage) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
 
     for (message.parts, 0..) |part, index| {
-        if (index > 0) try writer.writeByte('\n');
+        if (index > 0) try out.append(allocator, '\n');
         switch (part) {
-            .text => |value| try writer.writeAll(value),
-            .reasoning => |value| try writer.print("[reasoning]{s}", .{value}),
-            .tool_call => |value| try writer.print("[tool_call {s}]{s}", .{ value.tool_name, value.input_json }),
-            .tool_result => |value| try writer.print("[tool_result {s}]{s}", .{ value.tool_name, value.output_text }),
-            .system_reminder => |value| try writer.print("[system]{s}", .{value}),
-            .compaction_summary => |value| try writer.print("[compaction_summary {s} count={d}]{s}", .{ value.compacted_until_message_id, value.original_message_count, value.summary }),
-            .subtask => |value| try writer.print("[subtask {s} {s} {s}]{s}", .{ value.child_session_id, value.agent_id, value.status, value.summary }),
-            .subtask_aggregate => |value| try writer.print("[subtask_aggregate {s} {d}/{d}]{s}", .{ value.batch_id, value.success_count, value.failure_count, value.summary }),
+            .text => |value| try out.appendSlice(allocator, value),
+            .reasoning => |value| try out.print(allocator, "[reasoning]{s}", .{value}),
+            .tool_call => |value| try out.print(allocator, "[tool_call {s}]{s}", .{ value.tool_name, value.input_json }),
+            .tool_result => |value| try out.print(allocator, "[tool_result {s}]{s}", .{ value.tool_name, value.output_text }),
+            .system_reminder => |value| try out.print(allocator, "[system]{s}", .{value}),
+            .compaction_summary => |value| try out.print(allocator, "[compaction_summary {s} count={d}]{s}", .{ value.compacted_until_message_id, value.original_message_count, value.summary }),
+            .subtask => |value| try out.print(allocator, "[subtask {s} {s} {s}]{s}", .{ value.child_session_id, value.agent_id, value.status, value.summary }),
+            .subtask_aggregate => |value| try out.print(allocator, "[subtask_aggregate {s} {d}/{d}]{s}", .{ value.batch_id, value.success_count, value.failure_count, value.summary }),
         }
     }
 
@@ -886,9 +883,8 @@ fn gatherAssistantText(
         if (!std.mem.eql(u8, message.info.id, message_id)) continue;
         var out: std.ArrayListUnmanaged(u8) = .empty;
         defer out.deinit(allocator);
-        const writer = out.writer(allocator);
-        for (message.parts) |part| {
-            if (part == .text) try writer.writeAll(part.text.text);
+            for (message.parts) |part| {
+            if (part == .text) try out.appendSlice(allocator, part.text.text);
         }
         return allocator.dupe(u8, out.items);
     }
@@ -999,9 +995,9 @@ test "session runtime completes single tool-use loop and stores final response" 
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ fixture.root_path, "tool-read.txt" });
     defer std.testing.allocator.free(file_path);
     {
-        var file = try std.Io.Dir.cwd().createFile(file_path, .{ .truncate = true });
-        defer file.close();
-        try file.writeAll("tool-payload");
+        var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), file_path, .{ .truncate = true });
+        defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+        try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "tool-payload");
     }
     defer std.Io.Dir.cwd().deleteFile(file_path) catch {};
     MockProvider.tool_path = "tool-read.txt";
@@ -1334,8 +1330,7 @@ const MockProvider = struct {
     fn createClient(allocator: std.mem.Allocator, ctx: provider.ProviderRegistry.ProviderCreateContext) anyerror!provider.ProviderClient {
         const client = try allocator.create(MockClient);
         client.* = .{
-            .allocator = allocator,
-            .logger = ctx.logger,
+                        .logger = ctx.logger,
             .event_bus = ctx.event_bus,
         };
         return client.asProviderClient();

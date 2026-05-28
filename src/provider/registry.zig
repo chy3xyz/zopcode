@@ -67,8 +67,7 @@ pub const ProviderRegistry = struct {
 
     pub fn init(allocator: std.mem.Allocator, logger: ?*framework.Logger, event_bus: ?framework.EventBus) Self {
         return .{
-            .allocator = allocator,
-            .logger = logger,
+                        .logger = logger,
             .event_bus = event_bus,
         };
     }

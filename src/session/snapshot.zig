@@ -37,8 +37,7 @@ pub const FileSnapshotStore = struct {
     pub fn init(allocator: std.mem.Allocator, root_path: []const u8) !Self {
         _ = std.c.mkdir(@ptrCast(root_path.ptr), 0o755);
         return .{
-            .allocator = allocator,
-            .root_path = try allocator.dupe(u8, root_path),
+                        .root_path = try allocator.dupe(u8, root_path),
         };
     }
 
@@ -72,7 +71,7 @@ pub const FileSnapshotStore = struct {
             defer allocator.free(content_path);
             var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), content_path, .{ .truncate = true });
             defer file.close(std.Io.Threaded.global_single_threaded.*.io());
-            try file.writeAll(bytes);
+            try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), bytes);
         }
 
         const record = SnapshotRecord{
@@ -152,8 +151,7 @@ pub const SnapshotService = struct {
 
     pub fn init(allocator: std.mem.Allocator, logger: ?*framework.Logger, store: *FileSnapshotStore) Self {
         return .{
-            .allocator = allocator,
-            .logger = logger,
+                        .logger = logger,
             .store = store,
         };
     }
@@ -230,7 +228,7 @@ fn restoreRecord(allocator: std.mem.Allocator, root_path: []const u8, record: Sn
     if (std.fs.path.dirname(record.path)) |dir_name| _ = std.c.mkdir(@ptrCast(dir_name.ptr), 0o755);
     var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), record.path, .{ .truncate = true });
     defer file.close(std.Io.Threaded.global_single_threaded.*.io());
-    try file.writeAll(content);
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), content);
 }
 
 const SnapshotRecordJson = struct {
@@ -267,13 +265,12 @@ fn snapshotRecordFromJson(allocator: std.mem.Allocator, value: SnapshotRecordJso
 fn writeJsonFile(allocator: std.mem.Allocator, path: []const u8, value: anytype) !void {
     var rendered: std.ArrayListUnmanaged(u8) = .empty;
     defer rendered.deinit(allocator);
-    const writer = rendered.writer(allocator);
-    try writer.print("{f}", .{std.json.fmt(value, .{})});
+    try rendered.print(allocator, "{f}", .{std.json.fmt(value, .{})});
 
     if (std.fs.path.dirname(path)) |dir_name| _ = std.c.mkdir(@ptrCast(dir_name.ptr), 0o755);
     var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .truncate = true });
     defer file.close(std.Io.Threaded.global_single_threaded.*.io());
-    try file.writeAll(rendered.items);
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), rendered.items);
 }
 
 const max_file_bytes = 4 * 1024 * 1024;
@@ -292,7 +289,7 @@ test "snapshot service records and reverts tracked files" {
     {
         var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), target_path, .{ .truncate = true });
         defer file.close(std.Io.Threaded.global_single_threaded.*.io());
-        try file.writeAll("before");
+        try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "before");
     }
 
     var store = try FileSnapshotStore.init(std.testing.allocator, snapshot_root);
@@ -303,7 +300,7 @@ test "snapshot service records and reverts tracked files" {
     {
         var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), target_path, .{ .truncate = true });
         defer file.close(std.Io.Threaded.global_single_threaded.*.io());
-        try file.writeAll("after");
+        try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "after");
     }
 
     var result = try service.revertLatest(std.testing.allocator, "session_01", &.{target_path});

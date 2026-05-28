@@ -18,8 +18,7 @@ pub const TerminalApp = struct {
 
     pub fn init(allocator: std.mem.Allocator, client: *zopcode.Client, options: TerminalOptions) !Self {
         var self = Self{
-            .allocator = allocator,
-            .client = client,
+                        .client = client,
             .view_model = try model.TerminalViewModel.init(allocator, options.max_event_lines),
             .subscription = try client.subscribeEvents(0),
         };
@@ -601,9 +600,9 @@ fn makeTuiFixture(allocator: std.mem.Allocator) !TuiFixture {
     const global_path = try std.fs.path.join(allocator, &.{ root_path, "missing-global.json" });
     errdefer allocator.free(global_path);
 
-    var file = try std.Io.Dir.cwd().createFile(config_path, .{});
-    defer file.close();
-    try file.writeAll(
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), config_path, .{});
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), 
         \\{
         \\  "agent": { "default": "build" },
         \\  "session": { "store": { "path": "sessions" } }

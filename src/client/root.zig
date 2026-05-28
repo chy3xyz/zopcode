@@ -22,8 +22,7 @@ pub const Client = struct {
 
     pub fn init(allocator: std.mem.Allocator, tr: ClientTransport) Self {
         return .{
-            .allocator = allocator,
-            .transport = tr,
+                        .transport = tr,
         };
     }
 

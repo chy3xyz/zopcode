@@ -478,8 +478,7 @@ test "lsp runtime reuses clients and updates diagnostics cache via sink" {
             state.connect_count += 1;
             const client = try allocator.create(MockClient);
             client.* = .{
-                .allocator = allocator,
-                .server_id = try allocator.dupe(u8, server.id),
+                                .server_id = try allocator.dupe(u8, server.id),
                 .root_path = try allocator.dupe(u8, root_path),
                 .sink = sink,
             };
@@ -502,15 +501,15 @@ test "lsp runtime reuses clients and updates diagnostics cache via sink" {
 
     const marker_path = try std.fs.path.join(std.testing.allocator, &.{ workspace_dir, "build.zig" });
     defer std.testing.allocator.free(marker_path);
-    var marker = try std.Io.Dir.cwd().createFile(marker_path, .{});
-    defer marker.close();
+    var marker = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), marker_path, .{});
+    defer marker.close(std.Io.Threaded.global_single_threaded.*.io());
     try marker.writeAll("test");
 
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ src_dir, "main.zig" });
     defer std.testing.allocator.free(file_path);
-    var file = try std.Io.Dir.cwd().createFile(file_path, .{});
-    defer file.close();
-    try file.writeAll("const x = 1;");
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), file_path, .{});
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "const x = 1;");
 
     var memory_sink = framework.MemorySink.init(std.testing.allocator, 64);
     defer memory_sink.deinit();
@@ -614,15 +613,15 @@ test "lsp runtime keeps failed server entries in error state and does not treat 
 
     const marker_path = try std.fs.path.join(std.testing.allocator, &.{ workspace_dir, "build.zig" });
     defer std.testing.allocator.free(marker_path);
-    var marker = try std.Io.Dir.cwd().createFile(marker_path, .{});
-    defer marker.close();
+    var marker = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), marker_path, .{});
+    defer marker.close(std.Io.Threaded.global_single_threaded.*.io());
     try marker.writeAll("test");
 
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ src_dir, "main.zig" });
     defer std.testing.allocator.free(file_path);
-    var file = try std.Io.Dir.cwd().createFile(file_path, .{});
-    defer file.close();
-    try file.writeAll("const x = 1;");
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), file_path, .{});
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "const x = 1;");
 
     var memory_sink = framework.MemorySink.init(std.testing.allocator, 64);
     defer memory_sink.deinit();

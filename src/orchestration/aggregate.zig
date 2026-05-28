@@ -4,82 +4,80 @@ const types = @import("types.zig");
 pub fn toJson(allocator: std.mem.Allocator, result: types.AggregatedResult) ![]u8 {
     var buf: std.ArrayListUnmanaged(u8) = .empty;
     defer buf.deinit(allocator);
-    const writer = buf.writer(allocator);
 
-    try writer.writeAll("{\"batch_id\":");
-    try writeJsonString(writer, result.batch_id);
-    try writer.writeAll(",\"parent_session_id\":");
-    try writeJsonString(writer, result.parent_session_id);
-    try writer.writeAll(",\"summary\":");
-    try writeJsonString(writer, result.summary);
-    try writer.print(",\"success_count\":{d}", .{result.success_count});
-    try writer.print(",\"failure_count\":{d}", .{result.failure_count});
-    try writer.writeAll(",\"items\":[");
+    try buf.appendSlice(allocator, "{\"batch_id\":");
+    try writeJsonString(&buf, allocator, result.batch_id);
+    try buf.appendSlice(allocator, ",\"parent_session_id\":");
+    try writeJsonString(&buf, allocator, result.parent_session_id);
+    try buf.appendSlice(allocator, ",\"summary\":");
+    try writeJsonString(&buf, allocator, result.summary);
+    try buf.print(allocator, ",\"success_count\":{d}", .{result.success_count});
+    try buf.print(allocator, ",\"failure_count\":{d}", .{result.failure_count});
+    try buf.appendSlice(allocator, ",\"items\":[");
     for (result.items, 0..) |item, index| {
-        if (index > 0) try writer.writeByte(',');
-        try writer.writeAll("{\"child_session_id\":");
-        try writeJsonString(writer, item.child_session_id);
-        try writer.writeAll(",\"agent_id\":");
-        try writeJsonString(writer, item.agent_id);
-        try writer.writeAll(",\"status\":");
-        try writeJsonString(writer, item.status);
-        try writer.writeAll(",\"request_id\":");
-        try writeJsonString(writer, item.request_id);
-        try writer.writeAll(",\"task_id\":");
-        try writeJsonString(writer, item.task_id);
-        try writer.writeAll(",\"summary\":");
-        try writeJsonString(writer, item.summary);
-        try writer.writeByte('}');
+        if (index > 0) try buf.append(allocator, ',');
+        try buf.appendSlice(allocator, "{\"child_session_id\":");
+        try writeJsonString(&buf, allocator, item.child_session_id);
+        try buf.appendSlice(allocator, ",\"agent_id\":");
+        try writeJsonString(&buf, allocator, item.agent_id);
+        try buf.appendSlice(allocator, ",\"status\":");
+        try writeJsonString(&buf, allocator, item.status);
+        try buf.appendSlice(allocator, ",\"request_id\":");
+        try writeJsonString(&buf, allocator, item.request_id);
+        try buf.appendSlice(allocator, ",\"task_id\":");
+        try writeJsonString(&buf, allocator, item.task_id);
+        try buf.appendSlice(allocator, ",\"summary\":");
+        try writeJsonString(&buf, allocator, item.summary);
+        try buf.append(allocator, '}');
     }
-    try writer.writeAll("]}");
+    try buf.appendSlice(allocator, "]}");
     return allocator.dupe(u8, buf.items);
 }
 
 pub fn childResultsJson(allocator: std.mem.Allocator, items: []const types.ChildResult) ![]u8 {
     var buf: std.ArrayListUnmanaged(u8) = .empty;
     defer buf.deinit(allocator);
-    const writer = buf.writer(allocator);
 
-    try writer.writeByte('[');
+    try buf.append(allocator, '[');
     for (items, 0..) |item, index| {
-        if (index > 0) try writer.writeByte(',');
-        try writer.writeAll("{\"child_session_id\":");
-        try writeJsonString(writer, item.child_session_id);
-        try writer.writeAll(",\"agent_id\":");
-        try writeJsonString(writer, item.agent_id);
-        try writer.writeAll(",\"status\":");
-        try writeJsonString(writer, item.status);
-        try writer.writeAll(",\"request_id\":");
-        try writeJsonString(writer, item.request_id);
-        try writer.writeAll(",\"task_id\":");
-        try writeJsonString(writer, item.task_id);
-        try writer.writeAll(",\"summary\":");
-        try writeJsonString(writer, item.summary);
-        try writer.writeByte('}');
+        if (index > 0) try buf.append(allocator, ',');
+        try buf.appendSlice(allocator, "{\"child_session_id\":");
+        try writeJsonString(&buf, allocator, item.child_session_id);
+        try buf.appendSlice(allocator, ",\"agent_id\":");
+        try writeJsonString(&buf, allocator, item.agent_id);
+        try buf.appendSlice(allocator, ",\"status\":");
+        try writeJsonString(&buf, allocator, item.status);
+        try buf.appendSlice(allocator, ",\"request_id\":");
+        try writeJsonString(&buf, allocator, item.request_id);
+        try buf.appendSlice(allocator, ",\"task_id\":");
+        try writeJsonString(&buf, allocator, item.task_id);
+        try buf.appendSlice(allocator, ",\"summary\":");
+        try writeJsonString(&buf, allocator, item.summary);
+        try buf.append(allocator, '}');
     }
-    try writer.writeByte(']');
+    try buf.append(allocator, ']');
     return allocator.dupe(u8, buf.items);
 }
 
 fn writeJsonString(writer: anytype, value: []const u8) !void {
-    try writer.writeByte('"');
+    try buf.append(allocator, '"');
     for (value) |ch| {
         switch (ch) {
-            '"' => try writer.writeAll("\\\""),
-            '\\' => try writer.writeAll("\\\\"),
-            '\n' => try writer.writeAll("\\n"),
-            '\r' => try writer.writeAll("\\r"),
-            '\t' => try writer.writeAll("\\t"),
+            '"' => try buf.appendSlice(allocator, "\\\""),
+            '\\' => try buf.appendSlice(allocator, "\\\\"),
+            '\n' => try buf.appendSlice(allocator, "\\n"),
+            '\r' => try buf.appendSlice(allocator, "\\r"),
+            '\t' => try buf.appendSlice(allocator, "\\t"),
             else => {
                 if (ch < 32) {
-                    try writer.print("\\u00{x:0>2}", .{ch});
+                    try buf.print(allocator, "\\u00{x:0>2}", .{ch});
                 } else {
-                    try writer.writeByte(ch);
+                    try buf.append(allocator, ch);
                 }
             },
         }
     }
-    try writer.writeByte('"');
+    try buf.append(allocator, '"');
 }
 
 test "aggregated result renders stable json" {

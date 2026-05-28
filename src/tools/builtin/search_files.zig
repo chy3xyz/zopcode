@@ -63,11 +63,11 @@ fn searchDir(
     metadata: *std.ArrayListUnmanaged(u8),
     match_count: *usize,
 ) !void {
-    var dir = std.Io.Dir.cwd().openDir(path, .{ .iterate = true }) catch return;
-    defer dir.close();
+    var dir = std.Io.Dir.cwd().openDir(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .iterate = true }) catch return;
+    defer dir.close(std.Io.Threaded.global_single_threaded.*.io());
 
     var iterator = dir.iterate();
-    while (try iterator.next()) |entry| {
+    while (try iterator.next(std.Io.Threaded.global_single_threaded.*.io())) |entry| {
         const child_path = try std.fs.path.join(allocator, &.{ path, entry.name });
         defer allocator.free(child_path);
 
@@ -87,7 +87,7 @@ fn searchFile(
     metadata: *std.ArrayListUnmanaged(u8),
     match_count: *usize,
 ) !void {
-    const contents = std.Io.Dir.cwd().readFileAlloc(allocator, path, 256 * 1024) catch return;
+    const contents = std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), path, allocator, .limited(256 * 1024)) catch return;
     defer allocator.free(contents);
 
     var lines = std.mem.splitScalar(u8, contents, '\n');

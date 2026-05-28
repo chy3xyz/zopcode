@@ -21,18 +21,17 @@ pub fn renderSummary(allocator: std.mem.Allocator, vm: *const model.TerminalView
 pub fn renderSidebar(allocator: std.mem.Allocator, vm: *const model.TerminalViewModel) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
 
-    try writer.writeAll("== Sidebar ==\n");
-    try writer.print("Sessions: {d}\n", .{vm.session_statuses.len});
-    try writer.print("Workspaces: {d}\n", .{vm.workspaces.len});
-    try writer.print("Providers: {d}\n", .{if (vm.provider_catalog) |catalog| catalog.providers.len else 0});
-    try writer.print("LSP: {d} | MCP: {d} | Formatter: {d}\n", .{
+    try out.appendSlice(allocator, "== Sidebar ==\n");
+    try out.print(allocator, "Sessions: {d}\n", .{vm.session_statuses.len});
+    try out.print(allocator, "Workspaces: {d}\n", .{vm.workspaces.len});
+    try out.print(allocator, "Providers: {d}\n", .{if (vm.provider_catalog) |catalog| catalog.providers.len else 0});
+    try out.print(allocator, "LSP: {d} | MCP: {d} | Formatter: {d}\n", .{
         vm.lsp_statuses.len,
         vm.mcp_statuses.len,
         vm.formatter_statuses.len,
     });
-    try writer.print("Pending permissions: {d} | questions: {d}\n", .{
+    try out.print(allocator, "Pending permissions: {d} | questions: {d}\n", .{
         vm.pending_permissions.len,
         vm.pending_questions.len,
     });
@@ -61,32 +60,30 @@ pub fn renderLatestResponse(allocator: std.mem.Allocator, vm: *const model.Termi
 fn renderDashboard(allocator: std.mem.Allocator, vm: *const model.TerminalViewModel) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
 
-    try writer.writeAll("== Dashboard ==\n");
+    try out.appendSlice(allocator, "== Dashboard ==\n");
     if (vm.project) |project| {
-        try writer.print("Project: {s}\n", .{project.name});
-        try writer.print("Root: {s}\n", .{project.project_root});
-        try writer.print("VCS: {s} dirty={s} changed={d}\n", .{
+        try out.print(allocator, "Project: {s}\n", .{project.name});
+        try out.print(allocator, "Root: {s}\n", .{project.project_root});
+        try out.print(allocator, "VCS: {s} dirty={s} changed={d}\n", .{
             project.branch orelse "-",
             if (project.dirty) "yes" else "no",
             project.changed_file_count,
         });
     }
     if (vm.provider_catalog) |catalog| {
-        try writer.print("Default model: {s}\n", .{catalog.default_model orelse "-"});
+        try out.print(allocator, "Default model: {s}\n", .{catalog.default_model orelse "-"});
     }
-    try writer.print("Pending interactions: {d}\n", .{vm.pendingInteractionCount()});
+    try out.print(allocator, "Pending interactions: {d}\n", .{vm.pendingInteractionCount()});
     return allocator.dupe(u8, out.items);
 }
 
 fn renderSessions(allocator: std.mem.Allocator, vm: *const model.TerminalViewModel) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.writeAll("== Sessions ==\n");
+    try out.appendSlice(allocator, "== Sessions ==\n");
     for (vm.session_statuses) |item| {
-        try writer.print("{s} [{s}]\n", .{ item.session_id, item.status });
+        try out.print(allocator, "{s} [{s}]\n", .{ item.session_id, item.status });
     }
     return allocator.dupe(u8, out.items);
 }
@@ -94,10 +91,9 @@ fn renderSessions(allocator: std.mem.Allocator, vm: *const model.TerminalViewMod
 fn renderWorkspaces(allocator: std.mem.Allocator, vm: *const model.TerminalViewModel) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.writeAll("== Workspaces ==\n");
+    try out.appendSlice(allocator, "== Workspaces ==\n");
     for (vm.workspaces) |item| {
-        try writer.print("{s} ({s})\n", .{ item.name, item.id });
+        try out.print(allocator, "{s} ({s})\n", .{ item.name, item.id });
     }
     return allocator.dupe(u8, out.items);
 }
@@ -105,53 +101,51 @@ fn renderWorkspaces(allocator: std.mem.Allocator, vm: *const model.TerminalViewM
 fn renderRuntime(allocator: std.mem.Allocator, vm: *const model.TerminalViewModel) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.writeAll("== Runtime ==\n");
+    try out.appendSlice(allocator, "== Runtime ==\n");
     if (vm.provider_catalog) |catalog| {
-        try writer.print("Providers: {d}\n", .{catalog.providers.len});
+        try out.print(allocator, "Providers: {d}\n", .{catalog.providers.len});
         for (catalog.providers) |provider| {
-            try writer.print("- {s} [{s}] default={s}\n", .{ provider.id, provider.status, provider.default_model });
+            try out.print(allocator, "- {s} [{s}] default={s}\n", .{ provider.id, provider.status, provider.default_model });
         }
     }
-    try writer.print("Formatter statuses: {d}\n", .{vm.formatter_statuses.len});
+    try out.print(allocator, "Formatter statuses: {d}\n", .{vm.formatter_statuses.len});
     for (vm.formatter_statuses) |status| {
-        try writer.print("- {s} enabled={s}\n", .{ status.name, if (status.enabled) "yes" else "no" });
+        try out.print(allocator, "- {s} enabled={s}\n", .{ status.name, if (status.enabled) "yes" else "no" });
     }
-    try writer.print("LSP statuses: {d}\n", .{vm.lsp_statuses.len});
-    try writer.print("MCP statuses: {d}\n", .{vm.mcp_statuses.len});
+    try out.print(allocator, "LSP statuses: {d}\n", .{vm.lsp_statuses.len});
+    try out.print(allocator, "MCP statuses: {d}\n", .{vm.mcp_statuses.len});
     return allocator.dupe(u8, out.items);
 }
 
 fn renderPending(allocator: std.mem.Allocator, vm: *const model.TerminalViewModel) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.writeAll("== Pending ==\n");
+    try out.appendSlice(allocator, "== Pending ==\n");
 
     if (vm.pending_permissions.len == 0 and vm.pending_questions.len == 0) {
-        try writer.writeAll("No pending interactions\n");
+        try out.appendSlice(allocator, "No pending interactions\n");
         return allocator.dupe(u8, out.items);
     }
 
     if (vm.pending_permissions.len > 0) {
-        try writer.writeAll("Permissions:\n");
+        try out.appendSlice(allocator, "Permissions:\n");
         for (vm.pending_permissions) |item| {
-            try writer.print("- {s}: {s} tool={s}\n", .{
+            try out.print(allocator, "- {s}: {s} tool={s}\n", .{
                 item.id,
                 item.permission,
                 item.tool_name orelse "-",
             });
         }
-        try writer.writeAll("Use /permission <id> once|reject\n");
+        try out.appendSlice(allocator, "Use /permission <id> once|reject\n");
     }
 
     if (vm.pending_questions.len > 0) {
-        try writer.writeAll("Questions:\n");
+        try out.appendSlice(allocator, "Questions:\n");
         for (vm.pending_questions) |item| {
             const header = if (item.questions.len > 0) item.questions[0].header else "-";
-            try writer.print("- {s}: {s}\n", .{ item.id, header });
+            try out.print(allocator, "- {s}: {s}\n", .{ item.id, header });
         }
-        try writer.writeAll("Use /question <id> A;B,C style answers\n");
+        try out.appendSlice(allocator, "Use /question <id> A;B,C style answers\n");
     }
 
     return allocator.dupe(u8, out.items);

@@ -133,9 +133,9 @@ test "resolved paths can discover project config from current workspace" {
 
     const config_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "project", "zopcode.json" });
     defer std.testing.allocator.free(config_path);
-    var file = try std.Io.Dir.cwd().createFile(config_path, .{});
-    defer file.close();
-    try file.writeAll("{}");
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), config_path, .{});
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "{}");
 
     var resolved = try resolve(std.testing.allocator, .{
         .current_dir = project_dir,

@@ -302,8 +302,7 @@ pub fn handleRequest(allocator: std.mem.Allocator, services: *services_model.Ser
 fn jsonResponse(allocator: std.mem.Allocator, status: u16, value: anytype) !Response {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.print("{f}", .{std.json.fmt(value, .{})});
+    try out.print(allocator, "{f}", .{std.json.fmt(value, .{})});
     return .{
         .status = status,
         .content_type = try allocator.dupe(u8, "application/json"),
@@ -314,7 +313,6 @@ fn jsonResponse(allocator: std.mem.Allocator, status: u16, value: anytype) !Resp
 fn sseResponse(allocator: std.mem.Allocator, events: []const framework.RuntimeEvent) !Response {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
 
     for (events) |event| {
         const dto_value = dto.RuntimeEventDto{
@@ -323,9 +321,9 @@ fn sseResponse(allocator: std.mem.Allocator, events: []const framework.RuntimeEv
             .ts_unix_ms = event.ts_unix_ms,
             .payload_json = event.payload_json,
         };
-        try writer.writeAll("data: ");
-        try writer.print("{f}", .{std.json.fmt(dto_value, .{})});
-        try writer.writeAll("\n\n");
+        try out.appendSlice(allocator, "data: ");
+        try out.print(allocator, "{f}", .{std.json.fmt(dto_value, .{})});
+        try out.appendSlice(allocator, "\n\n");
     }
 
     return .{

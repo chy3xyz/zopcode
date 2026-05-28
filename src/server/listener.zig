@@ -26,8 +26,7 @@ pub const ServerListener = struct {
         const self = try allocator.create(Self);
         errdefer allocator.destroy(self);
         self.* = .{
-            .allocator = allocator,
-            .tcp_server = tcp_server,
+                        .tcp_server = tcp_server,
             .services = services_model.ServerServices.init(allocator, app_context),
         };
 
@@ -241,7 +240,7 @@ test "server listener exposes real local HTTP API" {
 
 fn rawHttpRequest(allocator: std.mem.Allocator, address: std.Io.net.Address, request_text: []const u8) ![]u8 {
     const stream = try std.Io.net.tcpConnectToAddress(address);
-    defer stream.close();
+    defer stream.close(std.Io.Threaded.global_single_threaded.*.io());
 
     try stream.writeAll(request_text);
     var buffer: [4096]u8 = undefined;

@@ -33,8 +33,7 @@ pub const ConfigRuntime = struct {
         options: RuntimeOptions,
     ) !Self {
         var self = Self{
-            .allocator = allocator,
-            .dependencies = dependencies,
+                        .dependencies = dependencies,
             .defaults = defaults.bootstrapDefaults(),
             .resolved_paths = try paths.resolve(allocator, options),
             .env_prefix = try allocator.dupe(u8, options.env_prefix),
@@ -232,19 +231,19 @@ test "config runtime loads layered config with deterministic precedence" {
     defer std.testing.allocator.free(project_config);
 
     {
-        var file = try std.Io.Dir.cwd().createFile(global_path, .{});
-        defer file.close();
-        try file.writeAll("{\"server\":{\"hostname\":\"127.0.0.1\"},\"model\":{\"default\":\"anthropic/claude-sonnet-4-5\"}}");
+        var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), global_path, .{});
+        defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+        try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "{\"server\":{\"hostname\":\"127.0.0.1\"},\"model\":{\"default\":\"anthropic/claude-sonnet-4-5\"}}");
     }
     {
-        var file = try std.Io.Dir.cwd().createFile(custom_path, .{});
-        defer file.close();
-        try file.writeAll("{\"agent\":{\"default\":\"plan\"}}");
+        var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), custom_path, .{});
+        defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+        try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "{\"agent\":{\"default\":\"plan\"}}");
     }
     {
-        var file = try std.Io.Dir.cwd().createFile(project_config, .{});
-        defer file.close();
-        try file.writeAll("{\"server\":{\"port\":9191},\"session\":{\"store\":{\"path\":\"data/sessions\"}}}");
+        var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), project_config, .{});
+        defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+        try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "{\"server\":{\"port\":9191},\"session\":{\"store\":{\"path\":\"data/sessions\"}}}");
     }
 
     var store = framework.MemoryConfigStore.init(std.testing.allocator);
@@ -317,9 +316,9 @@ test "config runtime emits discovery and summary logs during load" {
 
     const project_config = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "zopcode.json" });
     defer std.testing.allocator.free(project_config);
-    var file = try std.Io.Dir.cwd().createFile(project_config, .{});
-    defer file.close();
-    try file.writeAll("{\"agent\":{\"default\":\"plan\"}}");
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), project_config, .{});
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "{\"agent\":{\"default\":\"plan\"}}");
 
     const missing_global = try std.fs.path.join(std.testing.allocator, &.{ root_path, "missing-global.json" });
     defer std.testing.allocator.free(missing_global);
@@ -358,9 +357,9 @@ test "config runtime loads explicit lsp server definitions from project config" 
 
     const project_config = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "zopcode.json" });
     defer std.testing.allocator.free(project_config);
-    var file = try std.Io.Dir.cwd().createFile(project_config, .{});
-    defer file.close();
-    try file.writeAll(
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), project_config, .{});
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+    try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), 
         \\{
         \\  "lsp": {
         \\    "enabled": true,
