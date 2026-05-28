@@ -33,5 +33,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Migrated to Zig 0.17 `std.Io` APIs (file I/O, networking, threading)
 - Renamed project from `zig-opencode` to `zopcode`
 
+### Added (0.2.0)
+- **LLM runtime** — Streaming completion API with callback-based event forwarding, model catalog, health check
+- **ScriptBridge** — Framework tool integration (RepoHealthCheck + ScriptMarkdownFetch)
+- **Open source prep** — LICENSE, CONTRIBUTING.md, CHANGELOG.md, README rewrite
+
 ### Dependencies
 - `zaibase` framework (bundled in `zig-pkg/`)

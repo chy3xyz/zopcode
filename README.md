@@ -105,15 +105,15 @@ zig build test
 | server/ | 85% | HTTP API with 40+ DTOs |
 | client/ | 85% | Local + HTTP transports |
 | tui/ | 70% | Functional terminal UI |
-| lsp/ | 50% | Types, protocol, client/server |
-| mcp/ | 50% | Types, transport, runtime |
+| lsp/ | ✅ Functional | 65% | StdioLspClient, diagnostics, touch |
+| mcp/ | ✅ Functional | 65% | StdioMcpClient, tool/resource ops |
 | orchestration/ | 50% | Subtask orchestration |
 | permission/ | 50% | Rules, evaluation, runtime |
 | project/ | 50% | Workspace management |
 | pty/ | 40% | PTY types and runtime |
 | prompt/ | 40% | Assembly functions |
-| skill/ | 20% | Runtime scaffold |
-| llm/ | 5% | Empty module stub |
+| skill/ | ✅ Functional | 60% | Discovery, load, markdown parsing |
+| llm/ | 70% | LLM runtime with streaming callbacks |
 
 **Overall: ~60% complete.**
 
