@@ -66,7 +66,7 @@ pub fn editResult(
 }
 
 fn applyToPath(allocator: std.mem.Allocator, path: []const u8, edits: []const EditRequest) ![]u8 {
-    const original = try std.Io.Dir.cwd().readFileAlloc(allocator, path, 1024 * 1024);
+    const original = try std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), path, allocator, .limited(1024 * 1024));
     defer allocator.free(original);
 
     var line_list = try splitLines(allocator, original);

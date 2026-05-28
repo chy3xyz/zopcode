@@ -38,10 +38,9 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
 
         var out: std.ArrayListUnmanaged(u8) = .empty;
         defer out.deinit(ctx.allocator);
-        const writer = out.writer(ctx.allocator);
-        for (skills, 0..) |item, index| {
-            if (index > 0) try writer.writeByte('\n');
-            try writer.print("{s}: {s}", .{ item.id, item.summary });
+            for (skills, 0..) |item, index| {
+            if (index > 0) try out.append(ctx.allocator, '\n');
+            try out.print(ctx.allocator, "{s}: {s}", .{ item.id, item.summary });
         }
 
         return .{

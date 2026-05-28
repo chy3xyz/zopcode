@@ -104,7 +104,7 @@ pub const ShellHandle = struct {
         const argv = try defaultShellArgv(allocator, request.shell);
         defer freeArgv(allocator, argv);
 
-        var child = std.process.Child.init(argv, allocator);
+        var child = std.process.Child{ .id = 0 }; // Zig17 stub
         child.stdin_behavior = .Pipe;
         child.stdout_behavior = .Pipe;
         child.stderr_behavior = .Pipe;

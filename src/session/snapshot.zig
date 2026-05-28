@@ -98,7 +98,7 @@ pub const FileSnapshotStore = struct {
         const session_dir = try self.sessionDirPath(allocator, session_id);
         defer allocator.free(session_dir);
 
-        var dir = std.Io.Dir.cwd().openDir(session_dir, .{ .iterate = true }) catch |err| switch (err) {
+        var dir = std.Io.Dir.cwd().openDir(std.Io.Threaded.global_single_threaded.*.io(), session_dir, .{ .iterate = true }) catch |err| switch (err) {
             error.FileNotFound => return allocator.alloc(SnapshotRecord, 0),
             else => return err,
         };

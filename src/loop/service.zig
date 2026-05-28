@@ -472,11 +472,10 @@ pub const LoopService = struct {
 
             var out: std.ArrayListUnmanaged(u8) = .empty;
             defer out.deinit(self.allocator);
-            const writer = out.writer(self.allocator);
-            for (message.parts) |part| {
+                    for (message.parts) |part| {
                 switch (part) {
-                    .text => |value| try writer.writeAll(value.text),
-                    .reasoning => |value| try writer.writeAll(value.text),
+                    .text => |value| try out.appendSlice(self.allocator, value.text),
+                    .reasoning => |value| try out.appendSlice(self.allocator, value.text),
                     else => {},
                 }
             }

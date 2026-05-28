@@ -82,7 +82,7 @@ fn runShell(allocator: std.mem.Allocator, cwd: []const u8, command: []const u8) 
     else
         &[_][]const u8{ "sh", "-lc", command };
 
-    return std.process.Child.run(.{
+    return std.process.run(allocator, std.Io.Threaded.global_single_threaded.*.io(), .{
         .allocator = allocator,
         .argv = argv,
         .cwd = cwd,

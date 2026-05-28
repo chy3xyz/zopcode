@@ -25,7 +25,7 @@ pub fn nextSnapshotId(allocator: std.mem.Allocator) !SnapshotId {
 }
 
 fn nextId(allocator: std.mem.Allocator, prefix: []const u8) ![]const u8 {
-    id_mutex.lock();
+    while (!id_mutex.tryLock()) { std.atomic.spinLoopHint(); }
     const suffix = next_suffix;
     next_suffix += 1;
     id_mutex.unlock();

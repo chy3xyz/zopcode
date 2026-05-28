@@ -1,6 +1,6 @@
 .{
     .name = .zopcode, .version = "0.1.0",
-    .fingerprint = 0xcd284c940e422946,
+    .fingerprint = 0x8355e2df31da765f,
     .minimum_zig_version = "0.17.0",
     .dependencies = .{ .framework = .{
         .path = "zig-pkg/N-V-__8AAEFiCQCF7DAejdoWa1jxdLS4s4yawOM3PA9ZmazR/zaibase-master",

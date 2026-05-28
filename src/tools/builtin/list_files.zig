@@ -24,7 +24,7 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
     const resolved = try context_model.resolvePath(ctx.allocator, ctx.working_dir, raw_path);
     defer ctx.allocator.free(resolved);
 
-    var dir = try std.Io.Dir.cwd().openDir(resolved, .{ .iterate = true });
+    var dir = try std.Io.Dir.cwd().openDir(std.Io.Threaded.global_single_threaded.*.io(), resolved, .{ .iterate = true });
     defer dir.close();
 
     var output: std.ArrayListUnmanaged(u8) = .empty;

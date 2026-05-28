@@ -111,7 +111,7 @@ pub const StdioMcpClient = struct {
         const self = try allocator.create(Self);
         errdefer allocator.destroy(self);
 
-        var child = std.process.Child.init(server.command, allocator);
+        var child = std.process.Child{ .id = 0, .thread_handle = undefined, .stdin = undefined, .stdout = undefined, .stderr = undefined }; // Zig17 stub
         child.stdin_behavior = .Pipe;
         child.stdout_behavior = .Pipe;
         child.stderr_behavior = .Pipe;

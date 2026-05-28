@@ -7,11 +7,10 @@ pub const ResourceContent = types.ResourceContent;
 pub fn renderList(allocator: std.mem.Allocator, items: []const types.ResourceInfo) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
 
     for (items, 0..) |item, index| {
-        if (index > 0) try writer.writeByte('\n');
-        try writer.print("[{s}] {s} ({s})", .{ item.server_id, item.name, item.uri });
+        if (index > 0) try out.append(allocator, '\n');
+        try out.print(allocator, "[{s}] {s} ({s})", .{ item.server_id, item.name, item.uri });
     }
 
     return allocator.dupe(u8, out.items);

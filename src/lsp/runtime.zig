@@ -180,13 +180,12 @@ pub const LspRuntime = struct {
 
         var out: std.ArrayListUnmanaged(u8) = .empty;
         defer out.deinit(allocator);
-        const writer = out.writer(allocator);
-        try writer.print("LSP diagnostics detected in {s}:\n", .{file_path});
+            try out.print(allocator, "LSP diagnostics detected in {s}:\n", .{file_path});
         for (diagnostics, 0..) |item, index| {
             const pretty = try item.pretty(allocator);
             defer allocator.free(pretty);
-            if (index > 0) try writer.writeByte('\n');
-            try writer.writeAll(pretty);
+            if (index > 0) try out.append(allocator, '\n');
+            try out.appendSlice(allocator, pretty);
         }
         return allocator.dupe(u8, out.items);
     }
@@ -415,8 +414,7 @@ fn fileUriFromPath(allocator: std.mem.Allocator, file_path: []const u8) ![]u8 {
 fn encodeJsonAlloc(allocator: std.mem.Allocator, value: anytype) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.print("{f}", .{std.json.fmt(value, .{})});
+    try out.print(allocator, "{f}", .{std.json.fmt(value, .{})});
     return allocator.dupe(u8, out.items);
 }
 

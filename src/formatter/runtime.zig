@@ -204,14 +204,13 @@ fn buildArgv(allocator: std.mem.Allocator, command: [][]const u8, file_path: []c
 }
 
 fn runProcess(_: *anyopaque, allocator: std.mem.Allocator, cwd: []const u8, argv: [][]const u8) anyerror!RunOutput {
-    const result = try std.process.Child.run(.{
-        .allocator = allocator,
+    const result = try std.process.run(allocator, std.Io.Threaded.global_single_threaded.*.io(), .{
         .argv = argv,
-        .cwd = cwd,
-        .max_output_bytes = 512 * 1024,
+        .cwd = .{ .path = cwd },
+        .stdout_limit = .limited(512 * 1024), .stderr_limit = .limited(512 * 1024)
     });
     const exit_code: i32 = switch (result.term) {
-        .Exited => |code| code,
+        .exited => |code| code,
         else => 1,
     };
     return .{

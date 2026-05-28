@@ -238,8 +238,7 @@ fn publishRejectedEvent(allocator: std.mem.Allocator, event_bus: framework.Event
 fn encodeJsonAlloc(allocator: std.mem.Allocator, value: anytype) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.print("{f}", .{std.json.fmt(value, .{})});
+    try out.print(allocator, "{f}", .{std.json.fmt(value, .{})});
     return allocator.dupe(u8, out.items);
 }
 

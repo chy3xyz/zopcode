@@ -21,7 +21,7 @@ pub fn definition() tool_model.ToolDefinition {
 
 fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const framework.ValidationField) !result_model.ToolResult {
     const url = paramString(fields, "url") orelse return error.MissingUrl;
-    var client = std.http.Client{ .allocator = ctx.allocator };
+    var client = std.http.Client{ .allocator = ctx.allocator, .io = std.Io.Threaded.global_single_threaded.*.io() };
     defer client.deinit();
 
     const uri = try std.Uri.parse(url);
