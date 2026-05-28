@@ -55,7 +55,7 @@ pub const FileSnapshotStore = struct {
         defer allocator.free(session_dir);
         _ = std.c.mkdir(@ptrCast(session_dir.ptr), 0o755);
 
-        const contents = std.Io.Dir.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
+        const contents = std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), path, allocator, .limited(max_file_bytes)) catch |err| switch (err) {
             error.FileNotFound => null,
             else => return err,
         };
@@ -70,8 +70,8 @@ pub const FileSnapshotStore = struct {
         if (contents) |bytes| {
             const content_path = try std.fs.path.join(allocator, &.{ session_dir, content_rel_path.? });
             defer allocator.free(content_path);
-            var file = try std.Io.Dir.cwd().createFile(content_path, .{ .truncate = true });
-            defer file.close();
+            var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), content_path, .{ .truncate = true });
+            defer file.close(std.Io.Threaded.global_single_threaded.*.io());
             try file.writeAll(bytes);
         }
 
@@ -102,7 +102,7 @@ pub const FileSnapshotStore = struct {
             error.FileNotFound => return allocator.alloc(SnapshotRecord, 0),
             else => return err,
         };
-        defer dir.close();
+        defer dir.close(std.Io.Threaded.global_single_threaded.*.io());
 
         var items: std.ArrayListUnmanaged(SnapshotRecord) = .empty;
         errdefer {
@@ -111,12 +111,12 @@ pub const FileSnapshotStore = struct {
         }
 
         var iterator = dir.iterate();
-        while (try iterator.next()) |entry| {
+        while (try iterator.next(std.Io.Threaded.global_single_threaded.*.io())) |entry| {
             if (entry.kind != .file) continue;
             if (!std.mem.endsWith(u8, entry.name, ".json")) continue;
             const full_path = try std.fs.path.join(allocator, &.{ session_dir, entry.name });
             defer allocator.free(full_path);
-            const contents = try std.Io.Dir.cwd().readFileAlloc(allocator, full_path, max_file_bytes);
+            const contents = try std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), full_path, allocator, .limited(max_file_bytes));
             defer allocator.free(contents);
             const parsed = try std.json.parseFromSlice(SnapshotRecordJson, allocator, contents, .{ .ignore_unknown_fields = true });
             defer parsed.deinit();
@@ -224,12 +224,12 @@ fn restoreRecord(allocator: std.mem.Allocator, root_path: []const u8, record: Sn
     defer allocator.free(session_dir);
     const content_path = try std.fs.path.join(allocator, &.{ session_dir, record.content_rel_path.? });
     defer allocator.free(content_path);
-    const content = try std.Io.Dir.cwd().readFileAlloc(allocator, content_path, max_file_bytes);
+    const content = try std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), content_path, allocator, .limited(max_file_bytes));
     defer allocator.free(content);
 
     if (std.fs.path.dirname(record.path)) |dir_name| _ = std.c.mkdir(@ptrCast(dir_name.ptr), 0o755);
-    var file = try std.Io.Dir.cwd().createFile(record.path, .{ .truncate = true });
-    defer file.close();
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), record.path, .{ .truncate = true });
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
     try file.writeAll(content);
 }
 
@@ -271,8 +271,8 @@ fn writeJsonFile(allocator: std.mem.Allocator, path: []const u8, value: anytype)
     try writer.print("{f}", .{std.json.fmt(value, .{})});
 
     if (std.fs.path.dirname(path)) |dir_name| _ = std.c.mkdir(@ptrCast(dir_name.ptr), 0o755);
-    var file = try std.Io.Dir.cwd().createFile(path, .{ .truncate = true });
-    defer file.close();
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .truncate = true });
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
     try file.writeAll(rendered.items);
 }
 
@@ -290,8 +290,8 @@ test "snapshot service records and reverts tracked files" {
     defer std.testing.allocator.free(target_path);
 
     {
-        var file = try std.Io.Dir.cwd().createFile(target_path, .{ .truncate = true });
-        defer file.close();
+        var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), target_path, .{ .truncate = true });
+        defer file.close(std.Io.Threaded.global_single_threaded.*.io());
         try file.writeAll("before");
     }
 
@@ -301,8 +301,8 @@ test "snapshot service records and reverts tracked files" {
 
     try service.recordFileBeforeMutation("session_01", target_path);
     {
-        var file = try std.Io.Dir.cwd().createFile(target_path, .{ .truncate = true });
-        defer file.close();
+        var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), target_path, .{ .truncate = true });
+        defer file.close(std.Io.Threaded.global_single_threaded.*.io());
         try file.writeAll("after");
     }
 

@@ -143,13 +143,15 @@ pub const StdioLspClient = struct {
         const self = try allocator.create(Self);
         errdefer allocator.destroy(self);
 
-        var child = std.process.Child{ .id = 0, .thread_handle = undefined, .stdin = undefined, .stdout = undefined, .stderr = undefined }; // Zig17 stub
-        child.stdin_behavior = .Pipe;
-        child.stdout_behavior = .Pipe;
-        child.stderr_behavior = .Pipe;
-        child.cwd = root_path;
-        try child.spawn();
-        errdefer _ = child.kill() catch {};
+        const io = std.Io.Threaded.global_single_threaded.*.io();
+        var child = try std.process.spawn(io, .{
+            .argv = server.command,
+            .cwd = .{ .path = root_path },
+            .stdin = .pipe,
+            .stdout = .pipe,
+            .stderr = .pipe,
+        });
+        errdefer child.kill(io);
 
         self.* = .{
             .allocator = allocator,
@@ -166,7 +168,7 @@ pub const StdioLspClient = struct {
         self.reader_thread = try std.Thread.spawn(.{}, readerMain, .{self});
         errdefer {
             self.closed = true;
-            _ = self.child.kill() catch {};
+            self.child.kill(std.Io.Threaded.global_single_threaded.*.io());
             if (self.reader_thread) |thread| thread.join();
         }
 
@@ -212,17 +214,18 @@ pub const StdioLspClient = struct {
     pub fn deinit(self: *Self) void {
         while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         self.closed = true;
-        self.condition.broadcast();
+        self.condition.broadcast(std.Io.Threaded.global_single_threaded.*.io());
         self.mutex.unlock();
 
-        _ = self.child.kill() catch {};
+        self.child.kill(std.Io.Threaded.global_single_threaded.*.io());
         if (self.reader_thread) |thread| thread.join();
 
         while (!self.write_mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.write_mutex.unlock();
-        if (self.child.stdin) |*stdin| stdin.close();
-        if (self.child.stdout) |*stdout| stdout.close();
-        if (self.child.stderr) |*stderr| stderr.close();
+        const io = std.Io.Threaded.global_single_threaded.*.io();
+        if (self.child.stdin) |*stdin| stdin.close(io);
+        if (self.child.stdout) |*stdout| stdout.close(io);
+        if (self.child.stderr) |*stderr| stderr.close(io);
 
         self.allocator.free(self.server_id);
         self.allocator.free(self.root_path);
@@ -238,7 +241,7 @@ pub const StdioLspClient = struct {
     }
 
     fn touchFile(self: *Self, allocator: std.mem.Allocator, file_path: []const u8, wait_for_diagnostics: bool) !void {
-        const contents = try std.Io.Dir.cwd().readFileAlloc(allocator, file_path, 1024 * 1024);
+        const contents = try std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), file_path, allocator, .limited(1024 * 1024));
         defer allocator.free(contents);
 
         const uri = try fileUriFromPath(allocator, file_path);
@@ -296,7 +299,7 @@ pub const StdioLspClient = struct {
         while (!self.write_mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.write_mutex.unlock();
         if (self.child.stdin == null) return error.LspClientClosed;
-        try protocol.writeMessage(self.child.stdin.?, payload);
+        try protocol.writeMessage(self.child.stdin.?, std.Io.Threaded.global_single_threaded.*.io(), payload);
         return self.waitForResponse(allocator, request_id, 5000 * std.time.ns_per_ms);
     }
 
@@ -311,7 +314,7 @@ pub const StdioLspClient = struct {
         while (!self.write_mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.write_mutex.unlock();
         if (self.child.stdin == null) return error.LspClientClosed;
-        try protocol.writeMessage(self.child.stdin.?, payload);
+        try protocol.writeMessage(self.child.stdin.?, std.Io.Threaded.global_single_threaded.*.io(), payload);
     }
 
     fn waitForResponse(self: *Self, allocator: std.mem.Allocator, request_id: i64, timeout_ns: u64) ![]u8 {
@@ -327,7 +330,7 @@ pub const StdioLspClient = struct {
             }
             if (self.reader_error != null) return error.LspReaderFailed;
             if (self.closed) return error.LspClientClosed;
-            self.condition.timedWait(&self.mutex, timeout_ns) catch return error.Timeout;
+            std.Io.sleep(std.Io.Threaded.global_single_threaded.*.io(), std.Io.Duration.fromNanoseconds(@intCast(timeout_ns)), .awake) catch return error.Timeout;
         }
     }
 
@@ -339,7 +342,7 @@ pub const StdioLspClient = struct {
             if ((self.diagnostic_seq_by_file.get(file_path) orelse 0) > previous_seq) return;
             if (self.reader_error != null) return error.LspReaderFailed;
             if (self.closed) return error.LspClientClosed;
-            self.condition.timedWait(&self.mutex, timeout_ns) catch return;
+            std.Io.sleep(std.Io.Threaded.global_single_threaded.*.io(), std.Io.Duration.fromNanoseconds(@intCast(timeout_ns)), .awake) catch return;
         }
     }
 
@@ -359,7 +362,7 @@ pub const StdioLspClient = struct {
             if (should_stop) return;
 
             const stdout = self.child.stdout orelse return self.failReader("stdout_closed");
-            const message = protocol.readMessageAlloc(self.allocator, stdout) catch |err| {
+            const message = protocol.readMessageAlloc(self.allocator, stdout, std.Io.Threaded.global_single_threaded.*.io()) catch |err| {
                 return self.failReader(@errorName(err));
             };
             defer self.allocator.free(message);
@@ -399,7 +402,7 @@ pub const StdioLspClient = struct {
             .ok = result_value != null,
             .payload_json = payload,
         });
-        self.condition.broadcast();
+        self.condition.broadcast(std.Io.Threaded.global_single_threaded.*.io());
     }
 
     fn handleDiagnosticsNotification(self: *Self, object: std.json.ObjectMap) !void {
@@ -425,7 +428,7 @@ pub const StdioLspClient = struct {
         } else {
             try self.diagnostic_seq_by_file.put(self.allocator, try self.allocator.dupe(u8, file_path), self.diagnostic_counter);
         }
-        self.condition.broadcast();
+        self.condition.broadcast(std.Io.Threaded.global_single_threaded.*.io());
     }
 
     fn failReader(self: *Self, error_name: []const u8) void {
@@ -434,7 +437,7 @@ pub const StdioLspClient = struct {
         if (self.reader_error != null) return;
         self.reader_error = self.allocator.dupe(u8, error_name) catch null;
         self.closed = true;
-        self.condition.broadcast();
+        self.condition.broadcast(std.Io.Threaded.global_single_threaded.*.io());
     }
 };
 
@@ -480,8 +483,7 @@ fn objectInt(object: std.json.ObjectMap, key: []const u8) ?i64 {
 fn stringifyJsonValue(allocator: std.mem.Allocator, value: std.json.Value) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.print("{f}", .{std.json.fmt(value, .{})});
+    try out.print(allocator, "{f}", .{std.json.fmt(value, .{})});
     return allocator.dupe(u8, out.items);
 }
 

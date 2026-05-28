@@ -83,10 +83,9 @@ fn runShell(allocator: std.mem.Allocator, cwd: []const u8, command: []const u8) 
         &[_][]const u8{ "sh", "-lc", command };
 
     return std.process.run(allocator, std.Io.Threaded.global_single_threaded.*.io(), .{
-        .allocator = allocator,
         .argv = argv,
         .cwd = cwd,
-        .max_output_bytes = 512 * 1024,
+        .stdout_limit = .limited(512 * 1024), .stderr_limit = .limited(512 * 1024)
     });
 }
 

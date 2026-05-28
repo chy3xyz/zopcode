@@ -33,17 +33,17 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
     defer metadata.deinit(ctx.allocator);
     const out_writer = output.writer(ctx.allocator);
     const meta_writer = metadata.writer(ctx.allocator);
-    try meta_writer.writeByte('[');
+    try output.append(allocator, '[');
 
     var iterator = dir.iterate();
     var index: usize = 0;
     while (try iterator.next()) |entry| {
-        if (index > 0) try meta_writer.writeByte(',');
-        try out_writer.print("{s}\t{s}\n", .{ entryKind(entry.kind), entry.name });
-        try meta_writer.print("{{\"name\":\"{s}\",\"kind\":\"{s}\"}}", .{ entry.name, entryKind(entry.kind) });
+        if (index > 0) try output.append(allocator, ',');
+        try out_output.print(allocator, "{s}\t{s}\n", .{ entryKind(entry.kind), entry.name });
+        try output.print(allocator, "{{\"name\":\"{s}\",\"kind\":\"{s}\"}}", .{ entry.name, entryKind(entry.kind) });
         index += 1;
     }
-    try meta_writer.writeByte(']');
+    try output.append(allocator, ']');
 
     ctx.logger.child("tools").child("list_files").info("tool executed", &.{
         framework.LogField.string("path", resolved),

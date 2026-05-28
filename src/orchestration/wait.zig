@@ -19,9 +19,8 @@ pub fn latestAssistantSummary(
         if (message.info.role != .assistant) continue;
         var out: std.ArrayListUnmanaged(u8) = .empty;
         defer out.deinit(allocator);
-        const writer = out.writer(allocator);
         for (message.parts) |part| {
-            if (part == .text) try writer.writeAll(part.text.text);
+            if (part == .text) try out.appendSlice(allocator, part.text.text);
         }
         return allocator.dupe(u8, out.items);
     }

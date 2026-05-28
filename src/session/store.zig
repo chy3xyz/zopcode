@@ -140,12 +140,12 @@ pub const FileSessionStore = struct {
 
         const messages_path = try self.messagesPath(allocator, info.id);
         defer allocator.free(messages_path);
-        const messages_file = try std.Io.Dir.cwd().createFile(messages_path, .{ .truncate = false });
+        const messages_file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), messages_path, .{ .truncate = false });
         messages_file.close();
 
         const parts_path = try self.partsPath(allocator, info.id);
         defer allocator.free(parts_path);
-        const parts_file = try std.Io.Dir.cwd().createFile(parts_path, .{ .truncate = false });
+        const parts_file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), parts_path, .{ .truncate = false });
         parts_file.close();
 
         try session_events.publishSessionCreatedEvent(self.allocator, self.event_bus, .{
@@ -166,7 +166,7 @@ pub const FileSessionStore = struct {
         const session_path = try self.sessionPath(allocator, session_id);
         defer allocator.free(session_path);
 
-        const contents = std.Io.Dir.cwd().readFileAlloc(allocator, session_path, max_file_bytes) catch |err| switch (err) {
+        const contents = std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), session_path, allocator, .limited(max_file_bytes)) catch |err| switch (err) {
             error.FileNotFound => return null,
             else => return err,
         };
@@ -181,11 +181,11 @@ pub const FileSessionStore = struct {
     }
 
     pub fn listSessions(self: *Self, allocator: std.mem.Allocator) ![]session_model.SessionInfo {
-        var dir = std.Io.Dir.cwd().openDir(self.root_path, .{ .iterate = true }) catch |err| switch (err) {
+        var dir = std.Io.Dir.cwd().openDir(std.Io.Threaded.global_single_threaded.*.io(), self.root_path, .{ .iterate = true }) catch |err| switch (err) {
             error.FileNotFound => return allocator.alloc(session_model.SessionInfo, 0),
             else => return err,
         };
-        defer dir.close();
+        defer dir.close(std.Io.Threaded.global_single_threaded.*.io());
 
         var results: std.ArrayListUnmanaged(session_model.SessionInfo) = .empty;
         errdefer {
@@ -194,13 +194,13 @@ pub const FileSessionStore = struct {
         }
 
         var iterator = dir.iterate();
-        while (try iterator.next()) |entry| {
+        while (try iterator.next(std.Io.Threaded.global_single_threaded.*.io())) |entry| {
             if (entry.kind != .directory) continue;
 
             const session_path = try std.fs.path.join(allocator, &.{ self.root_path, entry.name, session_file_name });
             defer allocator.free(session_path);
 
-            const contents = std.Io.Dir.cwd().readFileAlloc(allocator, session_path, max_file_bytes) catch |err| switch (err) {
+            const contents = std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), session_path, allocator, .limited(max_file_bytes)) catch |err| switch (err) {
                 error.FileNotFound => continue,
                 else => return err,
             };
@@ -343,7 +343,7 @@ pub const FileSessionStore = struct {
         const path = try self.partsPath(allocator, session_id);
         defer allocator.free(path);
 
-        const contents = std.Io.Dir.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
+        const contents = std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), path, allocator, .limited(max_file_bytes)) catch |err| switch (err) {
             error.FileNotFound => return 0,
             else => return err,
         };
@@ -359,7 +359,7 @@ pub const FileSessionStore = struct {
 
     fn readMessageRecords(self: *Self, allocator: std.mem.Allocator, path: []const u8) ![]message_model.MessageInfo {
         _ = self;
-        const contents = std.Io.Dir.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
+        const contents = std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), path, allocator, .limited(max_file_bytes)) catch |err| switch (err) {
             error.FileNotFound => return allocator.alloc(message_model.MessageInfo, 0),
             else => return err,
         };
@@ -387,7 +387,7 @@ pub const FileSessionStore = struct {
 
     fn readPartRecords(self: *Self, allocator: std.mem.Allocator, path: []const u8) ![]PartRecord {
         _ = self;
-        const contents = std.Io.Dir.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
+        const contents = std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), path, allocator, .limited(max_file_bytes)) catch |err| switch (err) {
             error.FileNotFound => return allocator.alloc(PartRecord, 0),
             else => return err,
         };
@@ -657,13 +657,12 @@ fn appendJsonLine(allocator: std.mem.Allocator, path: []const u8, value: anytype
     var rendered: std.ArrayListUnmanaged(u8) = .empty;
     defer rendered.deinit(allocator);
 
-    const writer = rendered.writer(allocator);
-    try writer.print("{f}", .{std.json.fmt(value, .{})});
-    try writer.writeByte('\n');
+    try rendered.print(allocator, "{f}", .{std.json.fmt(value, .{})});
+    try rendered.append(allocator, '\n');
 
     try ensureParentDirectory(path);
     var file = try openAppendFile(path);
-    defer file.close();
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
     try file.writeAll(rendered.items);
 }
 
@@ -671,12 +670,11 @@ fn writeJsonFile(allocator: std.mem.Allocator, path: []const u8, value: anytype)
     var rendered: std.ArrayListUnmanaged(u8) = .empty;
     defer rendered.deinit(allocator);
 
-    const writer = rendered.writer(allocator);
-    try writer.print("{f}", .{std.json.fmt(value, .{})});
+    try rendered.print(allocator, "{f}", .{std.json.fmt(value, .{})});
 
     try ensureParentDirectory(path);
-    var file = try std.Io.Dir.cwd().createFile(path, .{ .truncate = true });
-    defer file.close();
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .truncate = true });
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
     try file.writeAll(rendered.items);
 }
 
@@ -684,15 +682,14 @@ fn writeMessagesFile(allocator: std.mem.Allocator, path: []const u8, messages: [
     var rendered: std.ArrayListUnmanaged(u8) = .empty;
     defer rendered.deinit(allocator);
 
-    const writer = rendered.writer(allocator);
     for (messages) |message| {
-        try writer.print("{f}", .{std.json.fmt(messageInfoToJson(message), .{})});
-        try writer.writeByte('\n');
+        try rendered.print(allocator, "{f}", .{std.json.fmt(messageInfoToJson(message), .{})});
+        try rendered.append(allocator, '\n');
     }
 
     try ensureParentDirectory(path);
-    var file = try std.Io.Dir.cwd().createFile(path, .{ .truncate = true });
-    defer file.close();
+    var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .truncate = true });
+    defer file.close(std.Io.Threaded.global_single_threaded.*.io());
     try file.writeAll(rendered.items);
 }
 
@@ -703,8 +700,8 @@ fn ensureParentDirectory(path: []const u8) !void {
 }
 
 fn openAppendFile(path: []const u8) !std.fs.File {
-    var file = std.Io.Dir.cwd().openFile(path, .{ .mode = .read_write }) catch |err| switch (err) {
-        error.FileNotFound => try std.Io.Dir.cwd().createFile(path, .{ .read = true, .truncate = false }),
+    var file = std.Io.Dir.cwd().openFile(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .mode = .read_write }) catch |err| switch (err) {
+        error.FileNotFound => try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), path, .{ .read = true, .truncate = false }),
         else => return err,
     };
     try file.seekFromEnd(0);

@@ -72,7 +72,7 @@ pub const FileLoopStateStore = struct {
 
         const path = try self.statePath(allocator, loop_id);
         defer allocator.free(path);
-        const contents = std.Io.Dir.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
+        const contents = std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), path, allocator, .limited(max_file_bytes)) catch |err| switch (err) {
             error.FileNotFound => return null,
             else => return err,
         };
@@ -89,11 +89,12 @@ pub const FileLoopStateStore = struct {
         while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
-        var dir = std.Io.Dir.cwd().openDir(self.root_path, .{ .iterate = true }) catch |err| switch (err) {
+        const io = std.Io.Threaded.global_single_threaded.*.io();
+        var dir = std.Io.Dir.cwd().openDir(io, self.root_path, .{ .iterate = true }) catch |err| switch (err) {
             error.FileNotFound => return allocator.alloc(types.LoopState, 0),
             else => return err,
         };
-        defer dir.close();
+        defer dir.close(io);
 
         var results: std.ArrayListUnmanaged(types.LoopState) = .empty;
         errdefer {
@@ -102,13 +103,13 @@ pub const FileLoopStateStore = struct {
         }
 
         var iterator = dir.iterate();
-        while (try iterator.next()) |entry| {
+        while (try iterator.next(io)) |entry| {
             if (entry.kind != .file) continue;
             if (!std.mem.endsWith(u8, entry.name, ".json")) continue;
 
             const path = try std.fs.path.join(allocator, &.{ self.root_path, entry.name });
             defer allocator.free(path);
-            const contents = try std.Io.Dir.cwd().readFileAlloc(allocator, path, max_file_bytes);
+            const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, allocator, .limited(max_file_bytes));
             defer allocator.free(contents);
 
             const parsed = try std.json.parseFromSlice(LoopStateJson, allocator, contents, .{
@@ -234,15 +235,15 @@ fn writeJsonFile(allocator: std.mem.Allocator, path: []const u8, value: anytype)
     var rendered: std.ArrayListUnmanaged(u8) = .empty;
     defer rendered.deinit(allocator);
 
-    const writer = rendered.writer(allocator);
-    try writer.print("{f}", .{std.json.fmt(value, .{})});
+    try rendered.print(allocator, "{f}", .{std.json.fmt(value, .{})});
 
     if (std.fs.path.dirname(path)) |dir_name| {
         _ = std.c.mkdir(@ptrCast(dir_name.ptr), 0o755);
     }
-    var file = try std.Io.Dir.cwd().createFile(path, .{ .truncate = true });
-    defer file.close();
-    try file.writeAll(rendered.items);
+    const io = std.Io.Threaded.global_single_threaded.*.io();
+    var file = try std.Io.Dir.cwd().createFile(io, path, .{ .truncate = true });
+    defer file.close(io);
+    try file.writeStreamingAll(io, rendered.items);
 }
 
 const max_file_bytes = 1024 * 1024;

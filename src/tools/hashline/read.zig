@@ -9,15 +9,14 @@ pub fn renderHashlineRead(allocator: std.mem.Allocator, contents: []const u8) ![
 
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
 
     var lines = std.mem.splitScalar(u8, normalized, '\n');
     var line_no: usize = 1;
     while (lines.next()) |line| : (line_no += 1) {
-        if (line_no > 1) try writer.writeByte('\n');
+        if (line_no > 1) try out.append(allocator, '\n');
         const formatted = try anchor.formatReadLine(allocator, line_no, std.mem.trimEnd(u8, line, "\r"));
         defer allocator.free(formatted);
-        try writer.writeAll(formatted);
+        try out.appendSlice(allocator, formatted);
     }
 
     return allocator.dupe(u8, out.items);

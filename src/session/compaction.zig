@@ -210,52 +210,51 @@ fn latestSummaryIndex(history: []const history_model.MessageWithParts) usize {
 fn buildSummaryText(allocator: std.mem.Allocator, items: []const history_model.MessageWithParts) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
 
-    try writer.print("Compacted {d} earlier message(s):", .{items.len});
+    try list.print(allocator, "Compacted {d} earlier message(s):", .{items.len});
     for (items) |message| {
-        try writer.writeAll("\n- ");
-        try writer.writeAll(message.info.role.asText());
-        try writer.writeAll(": ");
+        try list.appendSlice(allocator, "\n- ");
+        try list.appendSlice(allocator, message.info.role.asText());
+        try list.appendSlice(allocator, ": ");
         var wrote_any = false;
         for (message.parts) |part| {
             switch (part) {
                 .text => |value| {
-                    try writeTruncated(writer, value.text, 120);
+                    try writeTruncated(&out, allocator, value.text, 120);
                     wrote_any = true;
                 },
                 .reasoning => |value| {
-                    try writeTruncated(writer, value.text, 120);
+                    try writeTruncated(&out, allocator, value.text, 120);
                     wrote_any = true;
                 },
                 .tool_call => |value| {
-                    try writer.print("[tool_call {s}]", .{value.tool_name});
+                    try list.print(allocator, "[tool_call {s}]", .{value.tool_name});
                     wrote_any = true;
                 },
                 .tool_result => |value| {
-                    try writer.print("[tool_result {s}]", .{value.tool_name});
+                    try list.print(allocator, "[tool_result {s}]", .{value.tool_name});
                     wrote_any = true;
                 },
                 .system_reminder => |value| {
-                    try writeTruncated(writer, value.text, 120);
+                    try writeTruncated(&out, allocator, value.text, 120);
                     wrote_any = true;
                 },
                 .compaction_summary => |value| {
-                    try writeTruncated(writer, value.summary, 120);
+                    try writeTruncated(&out, allocator, value.summary, 120);
                     wrote_any = true;
                 },
                 .subtask => |value| {
-                    try writeTruncated(writer, value.summary, 120);
+                    try writeTruncated(&out, allocator, value.summary, 120);
                     wrote_any = true;
                 },
                 .subtask_aggregate => |value| {
-                    try writeTruncated(writer, value.summary, 120);
+                    try writeTruncated(&out, allocator, value.summary, 120);
                     wrote_any = true;
                 },
             }
             if (wrote_any) break;
         }
-        if (!wrote_any) try writer.writeAll("(no content)");
+        if (!wrote_any) try list.appendSlice(allocator, "(no content)");
     }
 
     return allocator.dupe(u8, out.items);
@@ -263,8 +262,8 @@ fn buildSummaryText(allocator: std.mem.Allocator, items: []const history_model.M
 
 fn writeTruncated(writer: anytype, text: []const u8, max_len: usize) !void {
     const slice = if (text.len > max_len) text[0..max_len] else text;
-    try writer.writeAll(slice);
-    if (text.len > max_len) try writer.writeAll("...");
+    try list.appendSlice(allocator, slice);
+    if (text.len > max_len) try list.appendSlice(allocator, "...");
 }
 
 test "disabled compaction policy does not require compaction" {

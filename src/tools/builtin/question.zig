@@ -126,24 +126,23 @@ fn renderAnswers(
 ) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.writeAll("User answered your questions: ");
+    try out.appendSlice(allocator, "User answered your questions: ");
     for (questions, 0..) |item, index| {
-        if (index > 0) try writer.writeAll(", ");
-        try writer.writeByte('"');
-        try writer.writeAll(item.question);
-        try writer.writeAll("\"=\"");
+        if (index > 0) try out.appendSlice(allocator, ", ");
+        try out.append(allocator, '"');
+        try out.appendSlice(allocator, item.question);
+        try out.appendSlice(allocator, "\"=\"");
         if (index < answers.len and answers[index].selections.len > 0) {
             for (answers[index].selections, 0..) |selection, sel_index| {
-                if (sel_index > 0) try writer.writeAll(", ");
-                try writer.writeAll(selection);
+                if (sel_index > 0) try out.appendSlice(allocator, ", ");
+                try out.appendSlice(allocator, selection);
             }
         } else {
-            try writer.writeAll("Unanswered");
+            try out.appendSlice(allocator, "Unanswered");
         }
-        try writer.writeByte('"');
+        try out.append(allocator, '"');
     }
-    try writer.writeAll(". You can now continue with the user's answers in mind.");
+    try out.appendSlice(allocator, ". You can now continue with the user's answers in mind.");
     return allocator.dupe(u8, out.items);
 }
 

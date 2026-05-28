@@ -47,7 +47,7 @@ fn containsAnyMarker(allocator: std.mem.Allocator, directory: []const u8, marker
     for (markers) |marker| {
         const candidate = std.fs.path.join(allocator, &.{ directory, marker }) catch return false;
         defer allocator.free(candidate);
-        std.Io.Dir.cwd().access(candidate, .{}) catch continue;
+        std.Io.Dir.cwd().access(std.Io.Threaded.global_single_threaded.*.io(), candidate, .{}) catch continue;
         return true;
     }
     return false;

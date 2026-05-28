@@ -107,7 +107,7 @@ pub const QuestionRuntime = struct {
                 cloned[index] = try answer.clone(self.allocator);
             }
             entry.answers = cloned;
-            self.condition.broadcast();
+            self.condition.broadcast(std.Io.Threaded.global_single_threaded.*.io());
             return true;
         }
         return false;
@@ -119,7 +119,7 @@ pub const QuestionRuntime = struct {
         for (self.pending.items) |entry| {
             if (!std.mem.eql(u8, entry.request.id, request_id)) continue;
             entry.rejected = true;
-            self.condition.broadcast();
+            self.condition.broadcast(std.Io.Threaded.global_single_threaded.*.io());
             return true;
         }
         return false;
@@ -132,7 +132,7 @@ pub const QuestionRuntime = struct {
             if (findPendingLocked(self, request_id)) |entry| {
                 if (entry.rejected) {
                     removePendingLocked(self, request_id);
-                    self.condition.broadcast();
+                    self.condition.broadcast(std.Io.Threaded.global_single_threaded.*.io());
                     try publishRejectedEvent(self.allocator, self.event_bus, request_id, session_id);
                     entry.deinit(self.allocator);
                     self.allocator.destroy(entry);
@@ -145,7 +145,7 @@ pub const QuestionRuntime = struct {
                         cloned[index] = try answer.clone(self.allocator);
                     }
                     removePendingLocked(self, request_id);
-                    self.condition.broadcast();
+                    self.condition.broadcast(std.Io.Threaded.global_single_threaded.*.io());
                     try publishRepliedEvent(self.allocator, self.event_bus, request_id, session_id, answers);
                     entry.deinit(self.allocator);
                     self.allocator.destroy(entry);

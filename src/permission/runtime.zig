@@ -119,7 +119,7 @@ pub const PermissionRuntime = struct {
         for (self.pending.items) |entry| {
             if (!std.mem.eql(u8, entry.request.id, request_id)) continue;
             entry.reply = decision;
-            self.condition.broadcast();
+            self.condition.broadcast(std.Io.Threaded.global_single_threaded.*.io());
             return true;
         }
         return false;
@@ -132,7 +132,7 @@ pub const PermissionRuntime = struct {
             if (findPendingLocked(self, request_id)) |entry| {
                 if (entry.reply) |decision| {
                     removePendingLocked(self, request_id);
-                    self.condition.broadcast();
+                    self.condition.broadcast(std.Io.Threaded.global_single_threaded.*.io());
                     try publishRepliedEvent(self.allocator, self.event_bus, request_id, decision, session_id);
                     entry.deinit(self.allocator);
                     self.allocator.destroy(entry);

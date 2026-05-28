@@ -12,7 +12,7 @@ pub const ListenOptions = struct {
 
 pub const ServerListener = struct {
     allocator: std.mem.Allocator,
-    tcp_server: std.net.Server,
+    tcp_server: std.Io.net.Server,
     thread: ?std.Thread = null,
     services: services_model.ServerServices,
     stop_requested: std.atomic.Value(bool) = .init(false),
@@ -20,7 +20,7 @@ pub const ServerListener = struct {
     const Self = @This();
 
     pub fn init(allocator: std.mem.Allocator, app_context: *app_context_model.AppContext, options: ListenOptions) !*Self {
-        const address = try std.net.Address.parseIp(options.host, options.port);
+        const address = try std.Io.net.Address.parseIp(options.host, options.port);
         const tcp_server = try address.listen(.{ .reuse_address = true });
 
         const self = try allocator.create(Self);
@@ -38,7 +38,7 @@ pub const ServerListener = struct {
     pub fn deinit(self: *Self) void {
         self.stop_requested.store(true, .release);
         const wake_address = self.tcp_server.listen_address;
-        const wake_stream = std.net.tcpConnectToAddress(wake_address) catch null;
+        const wake_stream = std.Io.net.tcpConnectToAddress(wake_address) catch null;
         if (wake_stream) |stream| stream.close();
         if (self.thread) |thread| thread.join();
         self.tcp_server.deinit();
@@ -60,7 +60,7 @@ pub const ServerListener = struct {
         }
     }
 
-    fn handleConnection(self: *Self, connection: std.net.Server.Connection) !void {
+    fn handleConnection(self: *Self, connection: std.Io.net.Server.Connection) !void {
         defer connection.stream.close();
 
         var recv_buffer: [4096]u8 = undefined;
@@ -239,8 +239,8 @@ test "server listener exposes real local HTTP API" {
     return error.ExpectedCompletedSessionStatus;
 }
 
-fn rawHttpRequest(allocator: std.mem.Allocator, address: std.net.Address, request_text: []const u8) ![]u8 {
-    const stream = try std.net.tcpConnectToAddress(address);
+fn rawHttpRequest(allocator: std.mem.Allocator, address: std.Io.net.Address, request_text: []const u8) ![]u8 {
+    const stream = try std.Io.net.tcpConnectToAddress(address);
     defer stream.close();
 
     try stream.writeAll(request_text);

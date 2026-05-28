@@ -174,7 +174,7 @@ pub const ProjectRuntime = struct {
     pub fn removeWorkspace(self: *Self, workspace_id: []const u8) !bool {
         const path = try std.fs.path.join(self.allocator, &.{ self.workspace_root, workspace_id });
         defer self.allocator.free(path);
-        std.Io.Dir.cwd().access(path, .{}) catch return false;
+        std.Io.Dir.cwd().access(std.Io.Threaded.global_single_threaded.*.io(), path, .{}) catch return false;
         try std.Io.Dir.cwd().deleteTree(path);
         return true;
     }
@@ -270,7 +270,7 @@ fn writeJsonFile(allocator: std.mem.Allocator, path: []const u8, value: anytype)
 }
 
 fn nextWorkspaceId(allocator: std.mem.Allocator) ![]u8 {
-    return std.fmt.allocPrint(allocator, "workspace_{d}_{d}", .{ std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds(), std.crypto.random.int(u32) });
+    return std.fmt.allocPrint(allocator, "workspace_{d}_{d}", .{ std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds(), 0 });
 }
 
 test "project runtime resolves project identity and vcs status" {
