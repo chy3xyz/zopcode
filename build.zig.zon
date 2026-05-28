@@ -1,9 +1,25 @@
 .{
-    .name = .zopcode, .version = "0.1.0",
+    .name = .zopcode,
+    .version = "0.1.0",
     .fingerprint = 0x8355e2df31da765f,
     .minimum_zig_version = "0.17.0",
-    .dependencies = .{ .framework = .{
-        .path = "zig-pkg/N-V-__8AAEFiCQCF7DAejdoWa1jxdLS4s4yawOM3PA9ZmazR/zaibase-master",
-    }},
-    .paths = .{"README.md","build.zig","build.zig.zon","src","tests"},
+    .description = "A modular AI coding agent built with Zig",
+    .license = "MIT",
+    .links = .{"framework"},
+    .dependencies = .{
+        .framework = .{
+            .path = "zig-pkg/N-V-__8AAEFiCQCF7DAejdoWa1jxdLS4s4yawOM3PA9ZmazR/zaibase-master",
+        },
+    },
+    .paths = .{
+        "README.md",
+        "LICENSE",
+        "CONTRIBUTING.md",
+        "CHANGELOG.md",
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "tests",
+        "docs",
+    },
 }

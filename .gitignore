@@ -1,17 +1,32 @@
-out.log
-err.log
-out2.log
-err2.log
-zig-test.log
-*-tmp.log
-tmp.zig
-.tmp*
+# Build artifacts
+zig-out/
 .zig-cache/
 .zig-cache-global/
 .zig-cache-local/
 .zig-global-cache/
-zig-out/
-.zig-opencode-data/
-zig-opencode.exe
-zig-opencode.pdb
+
+# IDE / OS
 .DS_Store
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Temporary files
+tmp.zig
+.tmp*
+*-tmp.log
+
+# Windows binaries
+zopcode.exe
+zopcode.pdb
+
+# AI tool state (local only)
+.deepseek/
+.codewhale/
+.opencode/
+
+# Legacy
+.zig-opencode-data/

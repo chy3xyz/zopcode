@@ -1,6 +1,6 @@
-# zig-opencode
+# zopcode
 
-A Zig AI coding agent scaffold built on top of the `framework` package.
+A modular AI coding agent built with Zig, providing LLM provider abstraction, built-in tools, session management, and a terminal UI.
 
 **Status:** Foundation Stage  
 **Overall Completion:** ~60% (modules vary from scaffold to well-developed)
@@ -19,7 +19,7 @@ A Zig AI coding agent scaffold built on top of the `framework` package.
 
 ## Project Overview
 
-`zig-opencode` is a foundation-stage Zig AI coding agent scaffold. It provides:
+`zopcode` is a foundation-stage Zig AI coding agent scaffold. It provides:
 
 - **Modular architecture** with 20+ subsystems (agent, loop, tools, session, etc.)
 - **Provider abstraction** for multiple LLM backends (Anthropic, OpenAI)
