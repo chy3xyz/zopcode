@@ -500,7 +500,7 @@ const HttpEventSubscription = struct {
             var req = client.request(.GET, uri, .{
                 .keep_alive = false,
                 .headers = .{
-                    .user_agent = .{ .override = "zig-opencode/0.1.0" },
+                    .user_agent = .{ .override = "zopcode/0.1.0" },
                 },
             }) catch return;
             defer req.deinit();
@@ -575,7 +575,7 @@ const StdRequester = struct {
             .keep_alive = false,
             .headers = .{
                 .content_type = .{ .override = if (body != null) "application/json" else "" },
-                .user_agent = .{ .override = "zig-opencode/0.1.0" },
+                .user_agent = .{ .override = "zopcode/0.1.0" },
             },
         });
         defer req.deinit();

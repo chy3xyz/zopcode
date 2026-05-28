@@ -1,9 +1,9 @@
-//! zig-opencode — foundation scaffold for a Zig AI coding agent.
+//! zopcode — foundation scaffold for a Zig AI coding agent.
 
 const std = @import("std");
 const framework_pkg = @import("framework");
 
-pub const PACKAGE_NAME = "zig-opencode";
+pub const PACKAGE_NAME = "zopcode";
 pub const PACKAGE_VERSION = "0.1.0";
 
 pub const framework = framework_pkg;
@@ -92,7 +92,7 @@ test {
     std.testing.refAllDecls(@This());
 }
 
-test "zig-opencode metadata is non-empty" {
+test "zopcode metadata is non-empty" {
     try std.testing.expect(PACKAGE_NAME.len > 0);
     try std.testing.expect(PACKAGE_VERSION.len > 0);
 }

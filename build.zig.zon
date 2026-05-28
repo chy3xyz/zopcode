@@ -1,5 +1,5 @@
 .{
-    .name = .zig_opencode, .version = "0.1.0",
+    .name = .zopcode, .version = "0.1.0",
     .fingerprint = 0xcd284c940e422946,
     .minimum_zig_version = "0.17.0",
     .dependencies = .{ .framework = .{

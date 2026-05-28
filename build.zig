@@ -10,7 +10,7 @@ pub fn build(b: *std.Build) void {
     });
     const framework_mod = framework_dep.module("zaibase");
 
-    const lib_mod = b.addModule("zig_opencode", .{
+    const lib_mod = b.addModule("zopcode", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
@@ -18,14 +18,14 @@ pub fn build(b: *std.Build) void {
     lib_mod.addImport("framework", framework_mod);
 
     const exe = b.addExecutable(.{
-        .name = "zig-opencode",
+        .name = "zopcode",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
         }),
     });
-    exe.root_module.addImport("zig_opencode", lib_mod);
+    exe.root_module.addImport("zopcode", lib_mod);
     b.installArtifact(exe);
 
     const run_cmd = b.addRunArtifact(exe);
@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
         run_cmd.addArgs(args);
     }
 
-    const run_step = b.step("run", "Run the zig-opencode executable");
+    const run_step = b.step("run", "Run the zopcode executable");
     run_step.dependOn(&run_cmd.step);
 
     const root_tests = b.addTest(.{
@@ -45,12 +45,12 @@ pub fn build(b: *std.Build) void {
         }),
     });
     root_tests.root_module.addImport("framework", framework_mod);
-    root_tests.root_module.addImport("zig_opencode", lib_mod);
+    root_tests.root_module.addImport("zopcode", lib_mod);
 
     const run_root_tests = b.addRunArtifact(root_tests);
     if (b.args) |args| {
         run_root_tests.addArgs(args);
     }
-    const test_step = b.step("test", "Run zig-opencode unit tests");
+    const test_step = b.step("test", "Run zopcode unit tests");
     test_step.dependOn(&run_root_tests.step);
 }

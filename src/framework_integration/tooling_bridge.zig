@@ -102,7 +102,7 @@ test "tooling bridge runs framework repo health check" {
 
     const output = try bridge.runRepoHealth(
         std.testing.allocator,
-        "zig_opencode_bridge_repo_health_01",
+        "zopcode_bridge_repo_health_01",
         null,
         root_path,
         ".",

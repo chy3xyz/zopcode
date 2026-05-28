@@ -1,6 +1,6 @@
-# zig-opencode
+# zopcode
 
-`zig-opencode` is a Zig AI coding agent scaffold built on top of [`framework`](../framework).
+`zopcode` is a Zig AI coding agent scaffold built on top of [`framework`](../framework).
 
 Current status:
 

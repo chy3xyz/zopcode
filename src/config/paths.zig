@@ -6,7 +6,7 @@ pub const RuntimeOptions = struct {
     global_config_path: ?[]const u8 = null,
     custom_config_path: ?[]const u8 = null,
     env_pairs: ?[]const EnvPair = null,
-    env_prefix: []const u8 = "zig_opencode",
+    env_prefix: []const u8 = "zopcode",
 };
 
 pub const EnvPair = struct {
@@ -59,7 +59,7 @@ pub fn resolveRelativeToBase(allocator: std.mem.Allocator, base_path: []const u8
 fn defaultGlobalConfigPath(allocator: std.mem.Allocator) !?[]u8 {
     const raw = std.c.getenv("HOME") orelse std.c.getenv("USERPROFILE") orelse return null;
     const home = std.mem.sliceTo(raw, 0);
-    return try std.fs.path.join(allocator, &.{ home, ".config", "zig-opencode", "opencode.json" });
+    return try std.fs.path.join(allocator, &.{ home, ".config", "zopcode", "zopcode.json" });
 }
 
 fn customConfigPathFromEnv(allocator: std.mem.Allocator, env_pairs: ?[]const EnvPair) !?[]u8 {
@@ -85,7 +85,7 @@ fn findProjectConfigPath(
     defer allocator.free(current);
 
     while (true) {
-        const candidate = try std.fs.path.join(allocator, &.{ current, "opencode.json" });
+        const candidate = try std.fs.path.join(allocator, &.{ current, "zopcode.json" });
         if (fileExists(candidate)) {
             return candidate;
         }
@@ -131,7 +131,7 @@ test "resolved paths can discover project config from current workspace" {
     defer std.testing.allocator.free(project_dir);
     _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
-    const config_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "project", "opencode.json" });
+    const config_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "project", "zopcode.json" });
     defer std.testing.allocator.free(config_path);
     var file = try std.Io.Dir.cwd().createFile(config_path, .{});
     defer file.close();

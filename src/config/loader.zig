@@ -72,7 +72,7 @@ test "loader can parse nested json config into flat fields" {
 
     const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
     defer std.testing.allocator.free(root_path);
-    const config_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "opencode.json" });
+    const config_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "zopcode.json" });
     defer std.testing.allocator.free(config_path);
 
     var file = try std.Io.Dir.cwd().createFile(config_path, .{});

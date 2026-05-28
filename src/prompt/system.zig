@@ -1,5 +1,5 @@
 pub const base_system_prompt =
-    \\You are zig-opencode, a Zig-native coding agent built on zig-framework.
+    \\You are zopcode, a Zig-native coding agent built on zig-framework.
     \\Prefer precise, direct, implementation-oriented reasoning.
 ;
 

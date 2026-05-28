@@ -1,6 +1,6 @@
 const std = @import("std");
 const framework = @import("framework");
-const zig_opencode = @import("../root.zig");
+const zopcode = @import("../root.zig");
 const model = @import("model.zig");
 const render = @import("render.zig");
 
@@ -10,13 +10,13 @@ pub const TerminalOptions = struct {
 
 pub const TerminalApp = struct {
     allocator: std.mem.Allocator,
-    client: *zig_opencode.Client,
+    client: *zopcode.Client,
     view_model: model.TerminalViewModel,
-    subscription: zig_opencode.client.EventSubscription,
+    subscription: zopcode.client.EventSubscription,
 
     const Self = @This();
 
-    pub fn init(allocator: std.mem.Allocator, client: *zig_opencode.Client, options: TerminalOptions) !Self {
+    pub fn init(allocator: std.mem.Allocator, client: *zopcode.Client, options: TerminalOptions) !Self {
         var self = Self{
             .allocator = allocator,
             .client = client,
@@ -42,7 +42,7 @@ pub const TerminalApp = struct {
         try self.refreshDashboard();
     }
 
-    pub fn submitPrompt(self: *Self, text: []const u8) !zig_opencode.server.AcceptedResponse {
+    pub fn submitPrompt(self: *Self, text: []const u8) !zopcode.server.AcceptedResponse {
         const session_id = try self.ensureActiveSession(text);
         const accepted = try self.client.submitPrompt(session_id, .{ .text = text });
         try self.view_model.setStatus("running");
@@ -52,7 +52,7 @@ pub const TerminalApp = struct {
 
     pub fn pumpEvents(self: *Self, limit: usize) !usize {
         const events = try self.subscription.poll(self.allocator, limit);
-        defer zig_opencode.client.transport.freeEventDtos(self.allocator, events);
+        defer zopcode.client.transport.freeEventDtos(self.allocator, events);
 
         for (events) |event| {
             try self.applyEvent(event.topic, event.payload_json);
@@ -129,14 +129,14 @@ pub const TerminalApp = struct {
     }
 
     fn applyEvent(self: *Self, topic: []const u8, payload_json: []const u8) !void {
-        if (std.mem.eql(u8, topic, zig_opencode.session.SESSION_CREATED_EVENT_TOPIC)) {
+        if (std.mem.eql(u8, topic, zopcode.session.SESSION_CREATED_EVENT_TOPIC)) {
             const parsed = try std.json.parseFromSlice(SessionCreatedPayload, self.allocator, payload_json, .{ .ignore_unknown_fields = true });
             defer parsed.deinit();
             if (self.view_model.active_session_id == null) try self.view_model.setSession(parsed.value.sessionId);
             try self.view_model.appendEventLine("session created");
             return;
         }
-        if (std.mem.eql(u8, topic, zig_opencode.session.SESSION_STATUS_EVENT_TOPIC)) {
+        if (std.mem.eql(u8, topic, zopcode.session.SESSION_STATUS_EVENT_TOPIC)) {
             const parsed = try std.json.parseFromSlice(SessionStatusPayload, self.allocator, payload_json, .{ .ignore_unknown_fields = true });
             defer parsed.deinit();
             try self.view_model.setStatus(parsed.value.status);
@@ -145,7 +145,7 @@ pub const TerminalApp = struct {
             try self.view_model.appendEventLine(line);
             return;
         }
-        if (std.mem.eql(u8, topic, zig_opencode.session.TOOL_CALL_EVENT_TOPIC)) {
+        if (std.mem.eql(u8, topic, zopcode.session.TOOL_CALL_EVENT_TOPIC)) {
             const parsed = try std.json.parseFromSlice(ToolCallPayload, self.allocator, payload_json, .{ .ignore_unknown_fields = true });
             defer parsed.deinit();
             try self.view_model.setRecentTool(parsed.value.toolName);
@@ -154,7 +154,7 @@ pub const TerminalApp = struct {
             try self.view_model.appendEventLine(line);
             return;
         }
-        if (std.mem.eql(u8, topic, zig_opencode.session.TOOL_RESULT_COMPLETED_EVENT_TOPIC) or std.mem.eql(u8, topic, zig_opencode.session.TOOL_RESULT_FAILED_EVENT_TOPIC)) {
+        if (std.mem.eql(u8, topic, zopcode.session.TOOL_RESULT_COMPLETED_EVENT_TOPIC) or std.mem.eql(u8, topic, zopcode.session.TOOL_RESULT_FAILED_EVENT_TOPIC)) {
             const parsed = try std.json.parseFromSlice(ToolResultPayload, self.allocator, payload_json, .{ .ignore_unknown_fields = true });
             defer parsed.deinit();
             try self.view_model.setRecentTool(parsed.value.toolName);
@@ -163,7 +163,7 @@ pub const TerminalApp = struct {
             try self.view_model.appendEventLine(line);
             return;
         }
-        if (std.mem.eql(u8, topic, zig_opencode.session.SESSION_PART_APPENDED_EVENT_TOPIC) or std.mem.eql(u8, topic, zig_opencode.session.PROVIDER_RESPONSE_COMPLETED_TOPIC)) {
+        if (std.mem.eql(u8, topic, zopcode.session.SESSION_PART_APPENDED_EVENT_TOPIC) or std.mem.eql(u8, topic, zopcode.session.PROVIDER_RESPONSE_COMPLETED_TOPIC)) {
             try self.refreshLatestResponse();
             return;
         }
@@ -229,7 +229,7 @@ pub const TerminalApp = struct {
         if (spec.len == 0) return error.MissingQuestionAnswer;
 
         var answer_sets = std.mem.splitScalar(u8, spec, ';');
-        var answers = std.array_list.Managed(zig_opencode.server.QuestionAnswerDto).init(self.allocator);
+        var answers = std.array_list.Managed(zopcode.server.QuestionAnswerDto).init(self.allocator);
         defer {
             for (answers.items) |*item| item.deinit(self.allocator);
             answers.deinit();
@@ -296,10 +296,10 @@ const ToolResultPayload = struct {
     toolName: []const u8,
 };
 
-pub fn runLocal(allocator: std.mem.Allocator, app_context: *zig_opencode.AppContext) !void {
-    var services = zig_opencode.server.ServerServices.init(allocator, app_context);
-    const local_ptr = try zig_opencode.client.LocalTransport.init(allocator, &services);
-    var client = zig_opencode.client.Client.init(allocator, local_ptr.asTransport());
+pub fn runLocal(allocator: std.mem.Allocator, app_context: *zopcode.AppContext) !void {
+    var services = zopcode.server.ServerServices.init(allocator, app_context);
+    const local_ptr = try zopcode.client.LocalTransport.init(allocator, &services);
+    var client = zopcode.client.Client.init(allocator, local_ptr.asTransport());
     defer client.deinit();
 
     var app = try TerminalApp.init(allocator, &client, .{});
@@ -308,8 +308,8 @@ pub fn runLocal(allocator: std.mem.Allocator, app_context: *zig_opencode.AppCont
 }
 
 pub fn runAttached(allocator: std.mem.Allocator, base_url: []const u8) !void {
-    const http_ptr = try zig_opencode.client.HttpTransport.init(allocator, base_url);
-    var client = zig_opencode.client.Client.init(allocator, http_ptr.asTransport());
+    const http_ptr = try zopcode.client.HttpTransport.init(allocator, base_url);
+    var client = zopcode.client.Client.init(allocator, http_ptr.asTransport());
     defer client.deinit();
 
     var app = try TerminalApp.init(allocator, &client, .{});
@@ -319,21 +319,21 @@ pub fn runAttached(allocator: std.mem.Allocator, base_url: []const u8) !void {
 
 test "terminal app can submit a local prompt through client abstraction and render final assistant output" {
     const MockProvider = struct {
-        fn createClient(allocator: std.mem.Allocator, ctx: zig_opencode.ProviderRegistry.ProviderCreateContext) !zig_opencode.ProviderClient {
+        fn createClient(allocator: std.mem.Allocator, ctx: zopcode.ProviderRegistry.ProviderCreateContext) !zopcode.ProviderClient {
             const Client = struct {
                 allocator: std.mem.Allocator,
-                const vtable = zig_opencode.ProviderClient.VTable{
+                const vtable = zopcode.ProviderClient.VTable{
                     .stream = streamErased,
                     .deinit = deinitErased,
                 };
-                fn asClient(self: *@This()) zig_opencode.ProviderClient {
+                fn asClient(self: *@This()) zopcode.ProviderClient {
                     return .{ .ptr = @ptrCast(self), .vtable = &vtable };
                 }
-                fn stream(_: *@This(), _: zig_opencode.provider.ProviderExecutionContext, _: zig_opencode.ProviderRequest, sink: zig_opencode.provider.LlmEventSink) !void {
+                fn stream(_: *@This(), _: zopcode.provider.ProviderExecutionContext, _: zopcode.ProviderRequest, sink: zopcode.provider.LlmEventSink) !void {
                     try sink.onEvent(&.{ .text_delta = .{ .text = "hello from mock" } });
                     try sink.onEvent(&.{ .completed = .{ .stop_reason = "end_turn" } });
                 }
-                fn streamErased(ptr: *anyopaque, exec_ctx: zig_opencode.provider.ProviderExecutionContext, request: zig_opencode.ProviderRequest, sink: zig_opencode.provider.LlmEventSink) anyerror!void {
+                fn streamErased(ptr: *anyopaque, exec_ctx: zopcode.provider.ProviderExecutionContext, request: zopcode.ProviderRequest, sink: zopcode.provider.LlmEventSink) anyerror!void {
                     const self: *@This() = @ptrCast(@alignCast(ptr));
                     try self.stream(exec_ctx, request, sink);
                 }
@@ -358,13 +358,13 @@ test "terminal app can submit a local prompt through client abstraction and rend
         .default_model = .{ .provider_id = "mock", .model_id = "mock-model" },
     }, MockProvider.createClient);
     var attempt = try fixture.app_context.config_runtime.writeFields(&.{
-        .{ .key = zig_opencode.config.keys.model_default, .value = .{ .string = "mock/mock-model" } },
+        .{ .key = zopcode.config.keys.model_default, .value = .{ .string = "mock/mock-model" } },
     }, false);
     defer attempt.deinit();
 
-    var services = zig_opencode.server.ServerServices.init(std.testing.allocator, &fixture.app_context);
-    const local_ptr = try zig_opencode.client.LocalTransport.init(std.testing.allocator, &services);
-    var client = zig_opencode.client.Client.init(std.testing.allocator, local_ptr.asTransport());
+    var services = zopcode.server.ServerServices.init(std.testing.allocator, &fixture.app_context);
+    const local_ptr = try zopcode.client.LocalTransport.init(std.testing.allocator, &services);
+    var client = zopcode.client.Client.init(std.testing.allocator, local_ptr.asTransport());
     defer client.deinit();
 
     var app = try TerminalApp.init(std.testing.allocator, &client, .{});
@@ -388,25 +388,25 @@ test "terminal app consumes local client event stream updates" {
     var fixture = try makeTuiFixture(std.testing.allocator);
     defer fixture.deinit();
 
-    var services = zig_opencode.server.ServerServices.init(std.testing.allocator, &fixture.app_context);
-    const local_ptr = try zig_opencode.client.LocalTransport.init(std.testing.allocator, &services);
-    var client = zig_opencode.client.Client.init(std.testing.allocator, local_ptr.asTransport());
+    var services = zopcode.server.ServerServices.init(std.testing.allocator, &fixture.app_context);
+    const local_ptr = try zopcode.client.LocalTransport.init(std.testing.allocator, &services);
+    var client = zopcode.client.Client.init(std.testing.allocator, local_ptr.asTransport());
     defer client.deinit();
 
     var app = try TerminalApp.init(std.testing.allocator, &client, .{});
     defer app.deinit();
 
-    try zig_opencode.session.publishSessionCreatedEvent(std.testing.allocator, fixture.app_context.eventBus(), .{
+    try zopcode.session.publishSessionCreatedEvent(std.testing.allocator, fixture.app_context.eventBus(), .{
         .session_id = "session_01",
         .agent_id = "build",
         .title = "TUI",
     });
-    try zig_opencode.session.publishSessionStatusEvent(std.testing.allocator, fixture.app_context.eventBus(), .{
+    try zopcode.session.publishSessionStatusEvent(std.testing.allocator, fixture.app_context.eventBus(), .{
         .session_id = "session_01",
         .status = "running",
         .request_id = "req_01",
     });
-    try zig_opencode.session.publishToolCallEvent(std.testing.allocator, fixture.app_context.eventBus(), .{
+    try zopcode.session.publishToolCallEvent(std.testing.allocator, fixture.app_context.eventBus(), .{
         .request_id = "req_01",
         .session_id = "session_01",
         .call_id = "call_01",
@@ -423,7 +423,7 @@ test "terminal app consumes local client event stream updates" {
 
 test "terminal app refreshes richer dashboard state and renders pending panel" {
     const MockGit = struct {
-        fn run(_: *anyopaque, allocator: std.mem.Allocator, _: []const u8, argv: [][]const u8) anyerror!zig_opencode.project.runtime.RunOutput {
+        fn run(_: *anyopaque, allocator: std.mem.Allocator, _: []const u8, argv: [][]const u8) anyerror!zopcode.project.runtime.RunOutput {
             if (std.mem.eql(u8, argv[2], "--show-toplevel")) {
                 return .{ .stdout = try allocator.dupe(u8, "E:/repo\n"), .stderr = try allocator.alloc(u8, 0), .exit_code = 0 };
             }
@@ -438,10 +438,10 @@ test "terminal app refreshes richer dashboard state and renders pending panel" {
     defer fixture.deinit();
     fixture.app_context.project_runtime.vcs_executor = .{ .ptr = undefined, .run_fn = MockGit.run };
 
-    const option_defs = [_]zig_opencode.question.QuestionOption{
+    const option_defs = [_]zopcode.question.QuestionOption{
         .{ .label = "A", .description = "alpha" },
     };
-    const question_defs = [_]zig_opencode.question.QuestionInfo{
+    const question_defs = [_]zopcode.question.QuestionInfo{
         .{
             .header = "Mode",
             .question = "Choose one",
@@ -461,9 +461,9 @@ test "terminal app refreshes richer dashboard state and renders pending panel" {
     });
     defer pending_permission.deinit(std.testing.allocator);
 
-    var services = zig_opencode.server.ServerServices.init(std.testing.allocator, &fixture.app_context);
-    const local_ptr = try zig_opencode.client.LocalTransport.init(std.testing.allocator, &services);
-    var client = zig_opencode.client.Client.init(std.testing.allocator, local_ptr.asTransport());
+    var services = zopcode.server.ServerServices.init(std.testing.allocator, &fixture.app_context);
+    const local_ptr = try zopcode.client.LocalTransport.init(std.testing.allocator, &services);
+    var client = zopcode.client.Client.init(std.testing.allocator, local_ptr.asTransport());
     defer client.deinit();
 
     var app = try TerminalApp.init(std.testing.allocator, &client, .{});
@@ -480,10 +480,10 @@ test "terminal app can reply to pending permission and question commands" {
     var fixture = try makeTuiFixture(std.testing.allocator);
     defer fixture.deinit();
 
-    const option_defs = [_]zig_opencode.question.QuestionOption{
+    const option_defs = [_]zopcode.question.QuestionOption{
         .{ .label = "A", .description = "alpha" },
     };
-    const question_defs = [_]zig_opencode.question.QuestionInfo{
+    const question_defs = [_]zopcode.question.QuestionInfo{
         .{
             .header = "Mode",
             .question = "Choose one",
@@ -503,9 +503,9 @@ test "terminal app can reply to pending permission and question commands" {
     });
     defer pending_permission.deinit(std.testing.allocator);
 
-    var services = zig_opencode.server.ServerServices.init(std.testing.allocator, &fixture.app_context);
-    const local_ptr = try zig_opencode.client.LocalTransport.init(std.testing.allocator, &services);
-    var client = zig_opencode.client.Client.init(std.testing.allocator, local_ptr.asTransport());
+    var services = zopcode.server.ServerServices.init(std.testing.allocator, &fixture.app_context);
+    const local_ptr = try zopcode.client.LocalTransport.init(std.testing.allocator, &services);
+    var client = zopcode.client.Client.init(std.testing.allocator, local_ptr.asTransport());
     defer client.deinit();
 
     var app = try TerminalApp.init(std.testing.allocator, &client, .{});
@@ -538,7 +538,7 @@ test "terminal app can attach through http transport abstraction and consume rem
     var fixture = try makeTuiFixture(std.testing.allocator);
     defer fixture.deinit();
 
-    const listener = try zig_opencode.server.ServerListener.init(std.testing.allocator, &fixture.app_context, .{
+    const listener = try zopcode.server.ServerListener.init(std.testing.allocator, &fixture.app_context, .{
         .host = "127.0.0.1",
         .port = 0,
     });
@@ -547,8 +547,8 @@ test "terminal app can attach through http transport abstraction and consume rem
     const base_url = try listener.urlAlloc(std.testing.allocator);
     defer std.testing.allocator.free(base_url);
 
-    const http_ptr = try zig_opencode.client.HttpTransport.init(std.testing.allocator, base_url);
-    var client = zig_opencode.client.Client.init(std.testing.allocator, http_ptr.asTransport());
+    const http_ptr = try zopcode.client.HttpTransport.init(std.testing.allocator, base_url);
+    var client = zopcode.client.Client.init(std.testing.allocator, http_ptr.asTransport());
     defer client.deinit();
 
     var created = try client.createSession(.{ .title = "Attach" });
@@ -558,7 +558,7 @@ test "terminal app can attach through http transport abstraction and consume rem
     defer app.deinit();
     try app.attachSession(created.session_id);
 
-    try zig_opencode.session.publishSessionStatusEvent(std.testing.allocator, fixture.app_context.eventBus(), .{
+    try zopcode.session.publishSessionStatusEvent(std.testing.allocator, fixture.app_context.eventBus(), .{
         .session_id = created.session_id,
         .status = "running",
         .request_id = "req_attach",
@@ -575,7 +575,7 @@ const TuiFixture = struct {
     root_path: []u8,
     project_dir: []u8,
     global_path: []u8,
-    app_context: zig_opencode.AppContext,
+    app_context: zopcode.AppContext,
 
     pub fn deinit(self: *TuiFixture) void {
         self.app_context.deinit();
@@ -596,7 +596,7 @@ fn makeTuiFixture(allocator: std.mem.Allocator) !TuiFixture {
     errdefer allocator.free(project_dir);
     _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
-    const config_path = try std.fs.path.join(allocator, &.{ project_dir, "opencode.json" });
+    const config_path = try std.fs.path.join(allocator, &.{ project_dir, "zopcode.json" });
     defer allocator.free(config_path);
     const global_path = try std.fs.path.join(allocator, &.{ root_path, "missing-global.json" });
     errdefer allocator.free(global_path);
@@ -610,7 +610,7 @@ fn makeTuiFixture(allocator: std.mem.Allocator) !TuiFixture {
         \\}
     );
 
-    const app_context = try zig_opencode.AppContext.initWithConfigOptions(allocator, .{
+    const app_context = try zopcode.AppContext.initWithConfigOptions(allocator, .{
         .console_log_enabled = false,
     }, .{
         .current_dir = project_dir,

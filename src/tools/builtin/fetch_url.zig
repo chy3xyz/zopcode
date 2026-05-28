@@ -28,7 +28,7 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
     var req = try client.request(.GET, uri, .{
         .keep_alive = false,
         .headers = .{
-            .user_agent = .{ .override = "zig-opencode/0.1.0" },
+            .user_agent = .{ .override = "zopcode/0.1.0" },
         },
     });
     defer req.deinit();

@@ -123,7 +123,7 @@ pub const AnthropicClient = struct {
             .keep_alive = false,
             .headers = .{
                 .content_type = .{ .override = "application/json" },
-                .user_agent = .{ .override = "zig-opencode/0.1.0" },
+                .user_agent = .{ .override = "zopcode/0.1.0" },
             },
             .extra_headers = extra_headers[0..],
         });

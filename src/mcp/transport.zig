@@ -134,7 +134,7 @@ pub const StdioMcpClient = struct {
         }
 
         const initialize_params =
-            \\{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"zig-opencode","version":"0.1.0"}}
+            \\{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"zopcode","version":"0.1.0"}}
         ;
         const initialize_result = try self.requestJson(allocator, "initialize", initialize_params);
         allocator.free(initialize_result);

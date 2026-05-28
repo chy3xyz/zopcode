@@ -605,7 +605,7 @@ pub const AppContext = struct {
     }
 };
 
-test "zig-opencode app context composes framework app context" {
+test "zopcode app context composes framework app context" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
@@ -615,7 +615,7 @@ test "zig-opencode app context composes framework app context" {
     defer std.testing.allocator.free(project_dir);
     _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
-    const config_path = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "opencode.json" });
+    const config_path = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "zopcode.json" });
     defer std.testing.allocator.free(config_path);
     const global_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "missing-global.json" });
     defer std.testing.allocator.free(global_path);
@@ -1371,7 +1371,7 @@ fn makeTestAppContextWithConfig(allocator: std.mem.Allocator, config_json: []con
     errdefer allocator.free(project_dir);
     _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
-    const config_path = try std.fs.path.join(allocator, &.{ project_dir, "opencode.json" });
+    const config_path = try std.fs.path.join(allocator, &.{ project_dir, "zopcode.json" });
     defer allocator.free(config_path);
     const global_path = try std.fs.path.join(allocator, &.{ root_path, "missing-global.json" });
     errdefer allocator.free(global_path);

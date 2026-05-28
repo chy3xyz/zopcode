@@ -228,7 +228,7 @@ test "config runtime loads layered config with deterministic precedence" {
     defer std.testing.allocator.free(global_path);
     const custom_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "custom.json" });
     defer std.testing.allocator.free(custom_path);
-    const project_config = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "opencode.json" });
+    const project_config = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "zopcode.json" });
     defer std.testing.allocator.free(project_config);
 
     {
@@ -315,7 +315,7 @@ test "config runtime emits discovery and summary logs during load" {
     defer std.testing.allocator.free(project_dir);
     _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
-    const project_config = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "opencode.json" });
+    const project_config = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "zopcode.json" });
     defer std.testing.allocator.free(project_config);
     var file = try std.Io.Dir.cwd().createFile(project_config, .{});
     defer file.close();
@@ -356,7 +356,7 @@ test "config runtime loads explicit lsp server definitions from project config" 
     defer std.testing.allocator.free(project_dir);
     _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
-    const project_config = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "opencode.json" });
+    const project_config = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "zopcode.json" });
     defer std.testing.allocator.free(project_config);
     var file = try std.Io.Dir.cwd().createFile(project_config, .{});
     defer file.close();

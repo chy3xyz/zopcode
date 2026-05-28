@@ -664,7 +664,7 @@ fn makeOrchestrationFixture(allocator: std.mem.Allocator) !OrchestrationFixture 
     errdefer allocator.free(project_dir);
     _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
-    const config_path = try std.fs.path.join(allocator, &.{ project_dir, "opencode.json" });
+    const config_path = try std.fs.path.join(allocator, &.{ project_dir, "zopcode.json" });
     defer allocator.free(config_path);
     const global_path = try std.fs.path.join(allocator, &.{ root_path, "missing-global.json" });
     errdefer allocator.free(global_path);
