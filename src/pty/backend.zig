@@ -82,8 +82,8 @@ pub const ShellHandle = struct {
     shell: []u8,
     child: std.process.Child,
     sink: OutputSink,
-    write_mutex: std.Thread.Mutex = .{},
-    state_mutex: std.Thread.Mutex = .{},
+    write_mutex: std.atomic.Mutex = .unlocked,
+    state_mutex: std.atomic.Mutex = .unlocked,
     closed: bool = false,
     stdout_thread: ?std.Thread = null,
     stderr_thread: ?std.Thread = null,
@@ -151,14 +151,14 @@ pub const ShellHandle = struct {
     }
 
     fn writeInput(self: *Self, data: []const u8) !void {
-        self.write_mutex.lock();
+        while (!self.write_mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.write_mutex.unlock();
         if (self.child.stdin == null) return error.PtyClosed;
         try self.child.stdin.?.writeAll(data);
     }
 
     fn close(self: *Self) void {
-        self.state_mutex.lock();
+        while (!self.state_mutex.tryLock()) { std.atomic.spinLoopHint(); }
         const already_closed = self.closed;
         self.closed = true;
         self.state_mutex.unlock();

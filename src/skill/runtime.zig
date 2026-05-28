@@ -82,7 +82,7 @@ pub const SkillRuntime = struct {
     pub fn load(self: *Self, allocator: std.mem.Allocator, skill_id: []const u8) !?[]u8 {
         for (self.skills) |item| {
             if (!std.mem.eql(u8, item.id, skill_id)) continue;
-            return try std.fs.cwd().readFileAlloc(allocator, item.path, 1024 * 1024);
+            return try std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), item.path, allocator, .limited(1024 * 1024));
         }
         return null;
     }
@@ -96,18 +96,18 @@ fn discoverSkills(allocator: std.mem.Allocator, directories: [][]const u8) ![]Sk
     }
 
     for (directories) |dir_path| {
-        var dir = std.fs.cwd().openDir(dir_path, .{ .iterate = true }) catch |err| switch (err) {
+        var dir = std.Io.Dir.cwd().openDir(std.Io.Threaded.global_single_threaded.*.io(), dir_path, .{ .iterate = true }) catch |err| switch (err) {
             error.FileNotFound => continue,
             else => return err,
         };
-        defer dir.close();
+        defer dir.close(std.Io.Threaded.global_single_threaded.*.io());
 
         var it = dir.iterate();
-        while (try it.next()) |entry| {
+        while (try it.next(std.Io.Threaded.global_single_threaded.*.io())) |entry| {
             if (entry.kind != .directory) continue;
             const skill_path = try std.fs.path.join(allocator, &.{ dir_path, entry.name, "SKILL.md" });
             defer allocator.free(skill_path);
-            const bytes = std.fs.cwd().readFileAlloc(allocator, skill_path, 1024 * 1024) catch |err| switch (err) {
+            const bytes = std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), skill_path, allocator, .limited(1024 * 1024)) catch |err| switch (err) {
                 error.FileNotFound => continue,
                 else => return err,
             };
@@ -149,10 +149,10 @@ test "skill runtime discovers local skills and can load markdown" {
     defer std.testing.allocator.free(root_path);
     const skill_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "skills", "demo-skill" });
     defer std.testing.allocator.free(skill_dir);
-    try std.fs.cwd().makePath(skill_dir);
+    _ = std.c.mkdir(@ptrCast(skill_dir.ptr), 0o755);
     const skill_path = try std.fs.path.join(std.testing.allocator, &.{ skill_dir, "SKILL.md" });
     defer std.testing.allocator.free(skill_path);
-    var file = try std.fs.cwd().createFile(skill_path, .{ .truncate = true });
+    var file = try std.Io.Dir.cwd().createFile(skill_path, .{ .truncate = true });
     defer file.close();
     try file.writeAll("# Demo Skill\nA sample skill.");
 

@@ -440,15 +440,14 @@ fn encodeJsonObject(allocator: std.mem.Allocator, fields: []const JsonField) ![]
     var list: std.ArrayListUnmanaged(u8) = .empty;
     defer list.deinit(allocator);
 
-    const writer = list.writer(allocator);
-    try writer.writeByte('{');
+    try list.append(allocator, '{');
     var first = true;
     for (fields) |field| {
         if (field.value) |value| {
-            try appendJsonStringField(writer, field.key, value, &first);
+            try appendJsonStringField(&list, allocator, field.key, value, &first);
         }
     }
-    try writer.writeByte('}');
+    try list.append(allocator, '}');
     return allocator.dupe(u8, list.items);
 }
 
@@ -456,53 +455,52 @@ fn encodeToolResultPayload(allocator: std.mem.Allocator, event: ToolResultEvent)
     var list: std.ArrayListUnmanaged(u8) = .empty;
     defer list.deinit(allocator);
 
-    const writer = list.writer(allocator);
-    try writer.writeByte('{');
+    try list.append(allocator, '{');
     var first = true;
-    try appendJsonStringField(writer, "requestId", event.request_id, &first);
-    try appendJsonStringField(writer, "sessionId", event.session_id, &first);
-    try appendJsonStringField(writer, "callId", event.call_id, &first);
-    try appendJsonStringField(writer, "toolName", event.tool_name, &first);
-    try appendJsonStringField(writer, "outputText", event.output_text, &first);
-    try appendJsonStringField(writer, "metadataJson", event.metadata_json, &first);
-    if (event.trace_id) |trace_id| try appendJsonStringField(writer, "traceId", trace_id, &first);
-    if (event.error_code) |error_code| try appendJsonStringField(writer, "errorCode", error_code, &first);
-    if (!first) try writer.writeByte(',');
-    try writeJsonString(writer, "ok");
-    try writer.writeByte(':');
-    try writer.writeAll(if (event.ok) "true" else "false");
-    try writer.writeByte('}');
+    try appendJsonStringField(&list, allocator, "requestId", event.request_id, &first);
+    try appendJsonStringField(&list, allocator, "sessionId", event.session_id, &first);
+    try appendJsonStringField(&list, allocator, "callId", event.call_id, &first);
+    try appendJsonStringField(&list, allocator, "toolName", event.tool_name, &first);
+    try appendJsonStringField(&list, allocator, "outputText", event.output_text, &first);
+    try appendJsonStringField(&list, allocator, "metadataJson", event.metadata_json, &first);
+    if (event.trace_id) |trace_id| try appendJsonStringField(&list, allocator, "traceId", trace_id, &first);
+    if (event.error_code) |error_code| try appendJsonStringField(&list, allocator, "errorCode", error_code, &first);
+    if (!first) try list.append(allocator, ',');
+    try writeJsonString(&list, allocator, "ok");
+    try list.append(allocator, ':');
+    try list.appendSlice(allocator, if (event.ok) "true" else "false");
+    try list.append(allocator, '}');
 
     return allocator.dupe(u8, list.items);
 }
 
-fn appendJsonStringField(writer: anytype, key: []const u8, value: []const u8, first: *bool) !void {
-    if (!first.*) try writer.writeByte(',');
+fn appendJsonStringField(list: *std.ArrayListUnmanaged(u8), allocator: std.mem.Allocator, key: []const u8, value: []const u8, first: *bool) !void {
+    if (!first.*) try list.append(allocator, ',');
     first.* = false;
-    try writeJsonString(writer, key);
-    try writer.writeByte(':');
-    try writeJsonString(writer, value);
+    try writeJsonString(list, allocator, key);
+    try list.append(allocator, ':');
+    try writeJsonString(list, allocator, value);
 }
 
-fn writeJsonString(writer: anytype, value: []const u8) !void {
-    try writer.writeByte('"');
+fn writeJsonString(list: *std.ArrayListUnmanaged(u8), allocator: std.mem.Allocator, value: []const u8) !void {
+    try list.append(allocator, '"');
     for (value) |ch| {
         switch (ch) {
-            '"' => try writer.writeAll("\\\""),
-            '\\' => try writer.writeAll("\\\\"),
-            '\n' => try writer.writeAll("\\n"),
-            '\r' => try writer.writeAll("\\r"),
-            '\t' => try writer.writeAll("\\t"),
+            '"' => try list.appendSlice(allocator, "\\\""),
+            '\\' => try list.appendSlice(allocator, "\\\\"),
+            '\n' => try list.appendSlice(allocator, "\\n"),
+            '\r' => try list.appendSlice(allocator, "\\r"),
+            '\t' => try list.appendSlice(allocator, "\\t"),
             else => {
                 if (ch < 32) {
-                    try writer.print("\\u00{x:0>2}", .{ch});
+                    try list.print(allocator, "\\u00{x:0>2}", .{ch});
                 } else {
-                    try writer.writeByte(ch);
+                    try list.append(allocator, ch);
                 }
             },
         }
     }
-    try writer.writeByte('"');
+    try list.append(allocator, '"');
 }
 
 test "tool call events can be published and polled via event bus" {

@@ -27,7 +27,7 @@ pub const LspRuntime = struct {
     client_factory: client_model.ClientFactory,
     entries: std.ArrayListUnmanaged(*ClientRecord) = .empty,
     diagnostics_by_file: std.StringHashMapUnmanaged([]types.Diagnostic) = .empty,
-    mutex: std.Thread.Mutex = .{},
+    mutex: std.atomic.Mutex = .unlocked,
 
     const Self = @This();
 
@@ -63,7 +63,7 @@ pub const LspRuntime = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         self.client_factory.deinit(self.allocator);
@@ -156,7 +156,7 @@ pub const LspRuntime = struct {
     }
 
     pub fn diagnosticsForFile(self: *Self, allocator: std.mem.Allocator, file_path: []const u8) ![]types.Diagnostic {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const existing = self.diagnostics_by_file.get(file_path) orelse return allocator.alloc(types.Diagnostic, 0);
@@ -192,7 +192,7 @@ pub const LspRuntime = struct {
     }
 
     pub fn status(self: *Self, allocator: std.mem.Allocator) ![]types.Status {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         var items: std.ArrayListUnmanaged(types.Status) = .empty;
@@ -254,7 +254,7 @@ pub const LspRuntime = struct {
     }
 
     fn ensureRecord(self: *Self, server: config.LspServerConfig, root_path: []const u8) !*ClientRecord {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         for (self.entries.items) |entry| {
             if (std.mem.eql(u8, entry.server_id, server.id) and std.mem.eql(u8, entry.root_path, root_path)) {
                 self.mutex.unlock();
@@ -295,13 +295,13 @@ pub const LspRuntime = struct {
     }
 
     fn appendRecord(self: *Self, record: *ClientRecord) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         try self.entries.append(self.allocator, record);
     }
 
     fn markRecordError(self: *Self, record: *ClientRecord, error_name: []const u8) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         if (record.error_message) |value| self.allocator.free(value);
         record.error_message = try self.allocator.dupe(u8, error_name);
@@ -325,7 +325,7 @@ pub const LspRuntime = struct {
     }
 
     fn updateDiagnostics(self: *Self, file_path: []const u8, diagnostics: []const types.Diagnostic) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const cloned = try self.allocator.alloc(types.Diagnostic, diagnostics.len);
@@ -345,7 +345,7 @@ pub const LspRuntime = struct {
     }
 
     fn publishStatusEvent(self: *Self, record: *ClientRecord) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         try self.publishStatusEventLocked(record);
     }
@@ -500,17 +500,17 @@ test "lsp runtime reuses clients and updates diagnostics cache via sink" {
     defer std.testing.allocator.free(workspace_dir);
     const src_dir = try std.fs.path.join(std.testing.allocator, &.{ workspace_dir, "src" });
     defer std.testing.allocator.free(src_dir);
-    try std.fs.cwd().makePath(src_dir);
+    _ = std.c.mkdir(@ptrCast(src_dir.ptr), 0o755);
 
     const marker_path = try std.fs.path.join(std.testing.allocator, &.{ workspace_dir, "build.zig" });
     defer std.testing.allocator.free(marker_path);
-    var marker = try std.fs.cwd().createFile(marker_path, .{});
+    var marker = try std.Io.Dir.cwd().createFile(marker_path, .{});
     defer marker.close();
     try marker.writeAll("test");
 
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ src_dir, "main.zig" });
     defer std.testing.allocator.free(file_path);
-    var file = try std.fs.cwd().createFile(file_path, .{});
+    var file = try std.Io.Dir.cwd().createFile(file_path, .{});
     defer file.close();
     try file.writeAll("const x = 1;");
 
@@ -612,17 +612,17 @@ test "lsp runtime keeps failed server entries in error state and does not treat 
     defer std.testing.allocator.free(workspace_dir);
     const src_dir = try std.fs.path.join(std.testing.allocator, &.{ workspace_dir, "src" });
     defer std.testing.allocator.free(src_dir);
-    try std.fs.cwd().makePath(src_dir);
+    _ = std.c.mkdir(@ptrCast(src_dir.ptr), 0o755);
 
     const marker_path = try std.fs.path.join(std.testing.allocator, &.{ workspace_dir, "build.zig" });
     defer std.testing.allocator.free(marker_path);
-    var marker = try std.fs.cwd().createFile(marker_path, .{});
+    var marker = try std.Io.Dir.cwd().createFile(marker_path, .{});
     defer marker.close();
     try marker.writeAll("test");
 
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ src_dir, "main.zig" });
     defer std.testing.allocator.free(file_path);
-    var file = try std.fs.cwd().createFile(file_path, .{});
+    var file = try std.Io.Dir.cwd().createFile(file_path, .{});
     defer file.close();
     try file.writeAll("const x = 1;");
 

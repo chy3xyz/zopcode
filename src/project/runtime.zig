@@ -42,7 +42,7 @@ pub const ProjectRuntime = struct {
     pub fn init(deps: Dependencies) !*Self {
         const self = try deps.allocator.create(Self);
         errdefer deps.allocator.destroy(self);
-        try std.fs.cwd().makePath(deps.workspace_root);
+        _ = std.c.mkdir(@ptrCast(deps.workspace_root.ptr), 0o755);
         self.* = .{
             .allocator = deps.allocator,
             .logger = deps.logger,
@@ -117,7 +117,7 @@ pub const ProjectRuntime = struct {
     }
 
     pub fn listWorkspaces(self: *Self, allocator: std.mem.Allocator) ![]types.WorkspaceInfo {
-        var dir = std.fs.cwd().openDir(self.workspace_root, .{ .iterate = true }) catch |err| switch (err) {
+        var dir = std.Io.Dir.cwd().openDir(self.workspace_root, .{ .iterate = true }) catch |err| switch (err) {
             error.FileNotFound => return allocator.alloc(types.WorkspaceInfo, 0),
             else => return err,
         };
@@ -134,7 +134,7 @@ pub const ProjectRuntime = struct {
             if (entry.kind != .directory) continue;
             const meta_path = try std.fs.path.join(allocator, &.{ self.workspace_root, entry.name, "workspace.json" });
             defer allocator.free(meta_path);
-            const contents = std.fs.cwd().readFileAlloc(allocator, meta_path, 1024 * 1024) catch |err| switch (err) {
+            const contents = std.Io.Dir.cwd().readFileAlloc(allocator, meta_path, 1024 * 1024) catch |err| switch (err) {
                 error.FileNotFound => continue,
                 else => return err,
             };
@@ -152,13 +152,13 @@ pub const ProjectRuntime = struct {
         errdefer allocator.free(id);
         const path = try std.fs.path.join(allocator, &.{ self.workspace_root, id });
         errdefer allocator.free(path);
-        try std.fs.cwd().makePath(path);
+        _ = std.c.mkdir(@ptrCast(path.ptr), 0o755);
 
         const info = types.WorkspaceInfo{
             .id = id,
             .name = try allocator.dupe(u8, request.name),
             .path = path,
-            .created_at_ms = std.time.milliTimestamp(),
+            .created_at_ms = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds(),
         };
         errdefer {
             var owned = info;
@@ -174,8 +174,8 @@ pub const ProjectRuntime = struct {
     pub fn removeWorkspace(self: *Self, workspace_id: []const u8) !bool {
         const path = try std.fs.path.join(self.allocator, &.{ self.workspace_root, workspace_id });
         defer self.allocator.free(path);
-        std.fs.cwd().access(path, .{}) catch return false;
-        try std.fs.cwd().deleteTree(path);
+        std.Io.Dir.cwd().access(path, .{}) catch return false;
+        try std.Io.Dir.cwd().deleteTree(path);
         return true;
     }
 
@@ -194,14 +194,14 @@ fn gitRoot(self: *ProjectRuntime, allocator: std.mem.Allocator, cwd: []const u8)
 }
 
 fn runProcess(_: *anyopaque, allocator: std.mem.Allocator, cwd: []const u8, argv: [][]const u8) anyerror!RunOutput {
-    const result = try std.process.Child.run(.{
-        .allocator = allocator,
+    const result = try std.process.run(allocator, std.Io.Threaded.global_single_threaded.*.io(), .{
+        
         .argv = argv,
-        .cwd = cwd,
-        .max_output_bytes = 512 * 1024,
+        .cwd = .{ .path = cwd },
+        .stdout_limit = .limited(512 * 1024), .stderr_limit = .limited(512 * 1024)
     });
     const exit_code: i32 = switch (result.term) {
-        .Exited => |code| code,
+        .exited => |code| code,
         else => 1,
     };
     return .{
@@ -264,13 +264,13 @@ fn writeJsonFile(allocator: std.mem.Allocator, path: []const u8, value: anytype)
     defer out.deinit(allocator);
     const writer = out.writer(allocator);
     try writer.print("{f}", .{std.json.fmt(value, .{})});
-    var file = try std.fs.cwd().createFile(path, .{ .truncate = true });
+    var file = try std.Io.Dir.cwd().createFile(path, .{ .truncate = true });
     defer file.close();
     try file.writeAll(out.items);
 }
 
 fn nextWorkspaceId(allocator: std.mem.Allocator) ![]u8 {
-    return std.fmt.allocPrint(allocator, "workspace_{d}_{d}", .{ std.time.milliTimestamp(), std.crypto.random.int(u32) });
+    return std.fmt.allocPrint(allocator, "workspace_{d}_{d}", .{ std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds(), std.crypto.random.int(u32) });
 }
 
 test "project runtime resolves project identity and vcs status" {

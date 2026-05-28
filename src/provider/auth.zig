@@ -2,17 +2,13 @@ const std = @import("std");
 const framework = @import("framework");
 
 pub fn loadAnthropicApiKey(allocator: std.mem.Allocator) !?[]u8 {
-    return std.process.getEnvVarOwned(allocator, "ANTHROPIC_API_KEY") catch |err| switch (err) {
-        error.EnvironmentVariableNotFound => null,
-        else => err,
-    };
+    const raw = std.c.getenv("ANTHROPIC_API_KEY") orelse return null;
+    return try allocator.dupe(u8, std.mem.sliceTo(raw, 0));
 }
 
 pub fn loadOpenAIApiKey(allocator: std.mem.Allocator) !?[]u8 {
-    return std.process.getEnvVarOwned(allocator, "OPENAI_API_KEY") catch |err| switch (err) {
-        error.EnvironmentVariableNotFound => null,
-        else => err,
-    };
+    const raw = std.c.getenv("OPENAI_API_KEY") orelse return null;
+    return try allocator.dupe(u8, std.mem.sliceTo(raw, 0));
 }
 
 pub const ProviderAuthStatus = struct {
@@ -45,7 +41,7 @@ pub const ProviderAuthRuntime = struct {
     logger: ?*framework.Logger,
     store_path: []u8,
     records: std.StringHashMapUnmanaged([]u8) = .empty,
-    mutex: std.Thread.Mutex = .{},
+    mutex: std.atomic.Mutex = .unlocked,
 
     const Self = @This();
 
@@ -73,7 +69,7 @@ pub const ProviderAuthRuntime = struct {
     }
 
     pub fn setApiKey(self: *Self, provider_id: []const u8, api_key: []const u8) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         if (self.records.getPtr(provider_id)) |existing| {
@@ -86,7 +82,7 @@ pub const ProviderAuthRuntime = struct {
     }
 
     pub fn seedApiKeyIfMissing(self: *Self, provider_id: []const u8, api_key: []const u8) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         if (self.records.contains(provider_id)) return;
@@ -95,20 +91,20 @@ pub const ProviderAuthRuntime = struct {
     }
 
     pub fn getApiKeyDup(self: *Self, allocator: std.mem.Allocator, provider_id: []const u8) !?[]u8 {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         const existing = self.records.get(provider_id) orelse return null;
         return try allocator.dupe(u8, existing);
     }
 
     pub fn hasApiKey(self: *Self, provider_id: []const u8) bool {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         return self.records.contains(provider_id);
     }
 
     pub fn remove(self: *Self, provider_id: []const u8) !bool {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         if (self.records.fetchRemove(provider_id)) |entry| {
             self.allocator.free(entry.key);
@@ -120,7 +116,7 @@ pub const ProviderAuthRuntime = struct {
     }
 
     pub fn list(self: *Self, allocator: std.mem.Allocator) ![]ProviderAuthStatus {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         var items: std.ArrayListUnmanaged(ProviderAuthStatus) = .empty;
@@ -140,13 +136,13 @@ pub const ProviderAuthRuntime = struct {
     }
 
     fn load(self: *Self) !void {
-        const file = std.fs.cwd().openFile(self.store_path, .{ .mode = .read_only }) catch |err| switch (err) {
+        const file = std.Io.Dir.cwd().openFile(std.Io.Threaded.global_single_threaded.*.io(), self.store_path, .{ .mode = .read_only }) catch |err| switch (err) {
             error.FileNotFound => return,
             else => return err,
         };
-        defer file.close();
+        defer file.close(std.Io.Threaded.global_single_threaded.*.io());
 
-        const bytes = try file.readToEndAlloc(self.allocator, 1024 * 1024);
+        const bytes = try std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), self.store_path, self.allocator, .limited(1024 * 1024));
         defer self.allocator.free(bytes);
         if (bytes.len == 0) return;
 
@@ -160,7 +156,7 @@ pub const ProviderAuthRuntime = struct {
 
     fn saveLocked(self: *Self) !void {
         const parent = std.fs.path.dirname(self.store_path);
-        if (parent) |dir_path| try std.fs.cwd().makePath(dir_path);
+        if (parent) |dir_path| _ = std.c.mkdir(@ptrCast(dir_path.ptr), 0o755);
 
         var items = try self.allocator.alloc(PersistedRecord, self.records.count());
         defer {
@@ -182,12 +178,12 @@ pub const ProviderAuthRuntime = struct {
 
         var buffer: std.ArrayListUnmanaged(u8) = .empty;
         defer buffer.deinit(self.allocator);
-        const writer = buffer.writer(self.allocator);
-        try writer.print("{f}", .{std.json.fmt(PersistedDocument{ .items = items }, .{})});
+        
+        try buffer.print(self.allocator, "{f}", .{std.json.fmt(PersistedDocument{ .items = items }, .{})});
 
-        var file = try std.fs.cwd().createFile(self.store_path, .{ .truncate = true });
-        defer file.close();
-        try file.writeAll(buffer.items);
+        var file = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), self.store_path, .{ .truncate = true });
+        defer file.close(std.Io.Threaded.global_single_threaded.*.io());
+        try file.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), buffer.items);
     }
 };
 

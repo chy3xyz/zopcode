@@ -126,7 +126,7 @@ pub const LoopState = struct {
     }
 
     pub fn touch(self: *LoopState) void {
-        self.updated_at_ms = std.time.milliTimestamp();
+        self.updated_at_ms = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
     }
 };
 

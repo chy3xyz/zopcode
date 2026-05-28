@@ -34,7 +34,7 @@ pub fn resolve(allocator: std.mem.Allocator, options: RuntimeOptions) !ResolvedP
     const current_dir = if (options.current_dir) |current_dir|
         try allocator.dupe(u8, current_dir)
     else
-        try std.fs.cwd().realpathAlloc(allocator, ".");
+        try allocator.dupe(u8, ".");
 
     var resolved = ResolvedPaths{
         .current_dir = current_dir,
@@ -57,8 +57,8 @@ pub fn resolveRelativeToBase(allocator: std.mem.Allocator, base_path: []const u8
 }
 
 fn defaultGlobalConfigPath(allocator: std.mem.Allocator) !?[]u8 {
-    const home = std.process.getEnvVarOwned(allocator, "HOME") catch std.process.getEnvVarOwned(allocator, "USERPROFILE") catch return null;
-    defer allocator.free(home);
+    const raw = std.c.getenv("HOME") orelse std.c.getenv("USERPROFILE") orelse return null;
+    const home = std.mem.sliceTo(raw, 0);
     return try std.fs.path.join(allocator, &.{ home, ".config", "zig-opencode", "opencode.json" });
 }
 
@@ -72,7 +72,8 @@ fn customConfigPathFromEnv(allocator: std.mem.Allocator, env_pairs: ?[]const Env
         return null;
     }
 
-    return std.process.getEnvVarOwned(allocator, "OPENCODE_CONFIG") catch null;
+    const r = std.c.getenv("OPENCODE_CONFIG") orelse return null;
+    return try allocator.dupe(u8, std.mem.sliceTo(r, 0));
 }
 
 fn findProjectConfigPath(
@@ -110,13 +111,13 @@ fn isGitRoot(allocator: std.mem.Allocator, path: []const u8) !bool {
 }
 
 fn fileExists(path: []const u8) bool {
-    std.fs.cwd().access(path, .{}) catch return false;
+    std.Io.Dir.cwd().access(std.Io.Threaded.global_single_threaded.*.io(), path, .{}) catch return false;
     return true;
 }
 
 fn dirExists(path: []const u8) bool {
-    var dir = std.fs.cwd().openDir(path, .{}) catch return false;
-    dir.close();
+    var dir = std.Io.Dir.cwd().openDir(std.Io.Threaded.global_single_threaded.*.io(), path, .{}) catch return false;
+    dir.close(std.Io.Threaded.global_single_threaded.*.io());
     return true;
 }
 
@@ -128,11 +129,11 @@ test "resolved paths can discover project config from current workspace" {
     defer std.testing.allocator.free(root_path);
     const project_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "project", "nested" });
     defer std.testing.allocator.free(project_dir);
-    try std.fs.cwd().makePath(project_dir);
+    _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
     const config_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "project", "opencode.json" });
     defer std.testing.allocator.free(config_path);
-    var file = try std.fs.cwd().createFile(config_path, .{});
+    var file = try std.Io.Dir.cwd().createFile(config_path, .{});
     defer file.close();
     try file.writeAll("{}");
 

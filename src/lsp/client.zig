@@ -104,9 +104,9 @@ pub const StdioLspClient = struct {
     root_path: []u8,
     sink: DiagnosticsSink,
     child: std.process.Child,
-    write_mutex: std.Thread.Mutex = .{},
-    mutex: std.Thread.Mutex = .{},
-    condition: std.Thread.Condition = .{},
+    write_mutex: std.atomic.Mutex = .unlocked,
+    mutex: std.atomic.Mutex = .unlocked,
+    condition: std.Io.Condition = .init,
     next_request_id: i64 = 1,
     responses: std.ArrayListUnmanaged(ResponseRecord) = .empty,
     open_versions: std.StringHashMapUnmanaged(u32) = .empty,
@@ -210,7 +210,7 @@ pub const StdioLspClient = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         self.closed = true;
         self.condition.broadcast();
         self.mutex.unlock();
@@ -218,7 +218,7 @@ pub const StdioLspClient = struct {
         _ = self.child.kill() catch {};
         if (self.reader_thread) |thread| thread.join();
 
-        self.write_mutex.lock();
+        while (!self.write_mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.write_mutex.unlock();
         if (self.child.stdin) |*stdin| stdin.close();
         if (self.child.stdout) |*stdout| stdout.close();
@@ -238,13 +238,13 @@ pub const StdioLspClient = struct {
     }
 
     fn touchFile(self: *Self, allocator: std.mem.Allocator, file_path: []const u8, wait_for_diagnostics: bool) !void {
-        const contents = try std.fs.cwd().readFileAlloc(allocator, file_path, 1024 * 1024);
+        const contents = try std.Io.Dir.cwd().readFileAlloc(allocator, file_path, 1024 * 1024);
         defer allocator.free(contents);
 
         const uri = try fileUriFromPath(allocator, file_path);
         defer allocator.free(uri);
 
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         const previous_seq = self.diagnostic_seq_by_file.get(file_path) orelse 0;
         const version = if (self.open_versions.get(file_path)) |current| current + 1 else 0;
         if (self.open_versions.getPtr(file_path)) |ptr| {
@@ -279,7 +279,7 @@ pub const StdioLspClient = struct {
 
     fn requestJson(self: *Self, allocator: std.mem.Allocator, method: []const u8, params_json: []const u8) ![]u8 {
         const request_id = blk: {
-            self.mutex.lock();
+            while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
             defer self.mutex.unlock();
             const id = self.next_request_id;
             self.next_request_id += 1;
@@ -293,7 +293,7 @@ pub const StdioLspClient = struct {
         );
         defer allocator.free(payload);
 
-        self.write_mutex.lock();
+        while (!self.write_mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.write_mutex.unlock();
         if (self.child.stdin == null) return error.LspClientClosed;
         try protocol.writeMessage(self.child.stdin.?, payload);
@@ -308,14 +308,14 @@ pub const StdioLspClient = struct {
         );
         defer self.allocator.free(payload);
 
-        self.write_mutex.lock();
+        while (!self.write_mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.write_mutex.unlock();
         if (self.child.stdin == null) return error.LspClientClosed;
         try protocol.writeMessage(self.child.stdin.?, payload);
     }
 
     fn waitForResponse(self: *Self, allocator: std.mem.Allocator, request_id: i64, timeout_ns: u64) ![]u8 {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         while (true) {
@@ -332,7 +332,7 @@ pub const StdioLspClient = struct {
     }
 
     fn waitForDiagnostics(self: *Self, file_path: []const u8, previous_seq: u64, timeout_ns: u64) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         while (true) {
@@ -353,7 +353,7 @@ pub const StdioLspClient = struct {
 
     fn readerMain(self: *Self) void {
         while (true) {
-            self.mutex.lock();
+            while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
             const should_stop = self.closed;
             self.mutex.unlock();
             if (should_stop) return;
@@ -392,7 +392,7 @@ pub const StdioLspClient = struct {
         else
             try self.allocator.dupe(u8, "null");
 
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         try self.responses.append(self.allocator, .{
             .id = id,
@@ -417,7 +417,7 @@ pub const StdioLspClient = struct {
 
         try self.sink.onDiagnostics(self.allocator, self.server_id, self.root_path, file_path, diagnostics);
 
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         self.diagnostic_counter += 1;
         if (self.diagnostic_seq_by_file.getPtr(file_path)) |ptr| {
@@ -429,7 +429,7 @@ pub const StdioLspClient = struct {
     }
 
     fn failReader(self: *Self, error_name: []const u8) void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         if (self.reader_error != null) return;
         self.reader_error = self.allocator.dupe(u8, error_name) catch null;

@@ -912,7 +912,7 @@ fn waitForToolResult(allocator: std.mem.Allocator, event_bus: framework.EventBus
         for (results) |result| {
             if (std.mem.eql(u8, result.call_id, call_id)) return try result.clone(allocator);
         }
-        std.Thread.sleep(5 * std.time.ns_per_ms);
+        const _ts = std.c.timespec{ .sec = 0, .nsec = 5_000_000 }; _ = std.c.nanosleep(&_ts, null);
     }
 }
 
@@ -999,11 +999,11 @@ test "session runtime completes single tool-use loop and stores final response" 
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ fixture.root_path, "tool-read.txt" });
     defer std.testing.allocator.free(file_path);
     {
-        var file = try std.fs.cwd().createFile(file_path, .{ .truncate = true });
+        var file = try std.Io.Dir.cwd().createFile(file_path, .{ .truncate = true });
         defer file.close();
         try file.writeAll("tool-payload");
     }
-    defer std.fs.cwd().deleteFile(file_path) catch {};
+    defer std.Io.Dir.cwd().deleteFile(file_path) catch {};
     MockProvider.tool_path = "tool-read.txt";
 
     var session_info = try fixture.runtime.createSession("Loop", "build");

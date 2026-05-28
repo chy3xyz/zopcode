@@ -32,9 +32,9 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
     }
 
     if (std.fs.path.dirname(resolved)) |dir_name| {
-        try std.fs.cwd().makePath(dir_name);
+        _ = std.c.mkdir(@ptrCast(dir_name.ptr), 0o755);
     }
-    var file = try std.fs.cwd().createFile(resolved, .{ .truncate = true });
+    var file = try std.Io.Dir.cwd().createFile(resolved, .{ .truncate = true });
     defer file.close();
     try file.writeAll(content);
 

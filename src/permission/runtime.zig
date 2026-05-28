@@ -19,8 +19,8 @@ pub const PermissionRuntime = struct {
     event_bus: framework.EventBus,
     rules: []types.PermissionRule,
     next_id: u64 = 1,
-    mutex: std.Thread.Mutex = .{},
-    condition: std.Thread.Condition = .{},
+    mutex: std.atomic.Mutex = .unlocked,
+    condition: std.Io.Condition = .init,
     pending: std.ArrayListUnmanaged(*PendingEntry) = .empty,
 
     const Self = @This();
@@ -47,7 +47,7 @@ pub const PermissionRuntime = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         for (self.rules) |*rule| rule.deinit(self.allocator);
         self.allocator.free(self.rules);
@@ -87,7 +87,7 @@ pub const PermissionRuntime = struct {
         };
         errdefer entry.deinit(self.allocator);
 
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         try self.pending.append(self.allocator, entry);
         self.mutex.unlock();
 
@@ -101,7 +101,7 @@ pub const PermissionRuntime = struct {
     }
 
     pub fn list(self: *Self, allocator: std.mem.Allocator) ![]types.PermissionRequest {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const items = try allocator.alloc(types.PermissionRequest, self.pending.items.len);
@@ -114,7 +114,7 @@ pub const PermissionRuntime = struct {
     }
 
     pub fn reply(self: *Self, request_id: []const u8, decision: types.PermissionReply) !bool {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         for (self.pending.items) |entry| {
             if (!std.mem.eql(u8, entry.request.id, request_id)) continue;
@@ -126,7 +126,7 @@ pub const PermissionRuntime = struct {
     }
 
     pub fn waitForReply(self: *Self, request_id: []const u8, session_id: ?[]const u8) !types.PermissionReply {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         while (true) {
             if (findPendingLocked(self, request_id)) |entry| {
@@ -161,7 +161,7 @@ pub const PermissionRuntime = struct {
     }
 
     fn nextRequestId(self: *Self) u64 {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         const value = self.next_id;
         self.next_id += 1;

@@ -28,7 +28,7 @@ pub const LoopStateStore = struct {
 pub const FileLoopStateStore = struct {
     allocator: std.mem.Allocator,
     root_path: []u8,
-    mutex: std.Thread.Mutex = .{},
+    mutex: std.atomic.Mutex = .unlocked,
 
     const Self = @This();
 
@@ -39,7 +39,7 @@ pub const FileLoopStateStore = struct {
     };
 
     pub fn init(allocator: std.mem.Allocator, root_path: []const u8) !Self {
-        try std.fs.cwd().makePath(root_path);
+        _ = std.c.mkdir(@ptrCast(root_path.ptr), 0o755);
         return .{
             .allocator = allocator,
             .root_path = try allocator.dupe(u8, root_path),
@@ -58,7 +58,7 @@ pub const FileLoopStateStore = struct {
     }
 
     pub fn put(self: *Self, allocator: std.mem.Allocator, state: types.LoopState) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const path = try self.statePath(allocator, state.loop_id);
@@ -67,12 +67,12 @@ pub const FileLoopStateStore = struct {
     }
 
     pub fn get(self: *Self, allocator: std.mem.Allocator, loop_id: []const u8) !?types.LoopState {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const path = try self.statePath(allocator, loop_id);
         defer allocator.free(path);
-        const contents = std.fs.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
+        const contents = std.Io.Dir.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
             error.FileNotFound => return null,
             else => return err,
         };
@@ -86,10 +86,10 @@ pub const FileLoopStateStore = struct {
     }
 
     pub fn listActive(self: *Self, allocator: std.mem.Allocator) ![]types.LoopState {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
-        var dir = std.fs.cwd().openDir(self.root_path, .{ .iterate = true }) catch |err| switch (err) {
+        var dir = std.Io.Dir.cwd().openDir(self.root_path, .{ .iterate = true }) catch |err| switch (err) {
             error.FileNotFound => return allocator.alloc(types.LoopState, 0),
             else => return err,
         };
@@ -108,7 +108,7 @@ pub const FileLoopStateStore = struct {
 
             const path = try std.fs.path.join(allocator, &.{ self.root_path, entry.name });
             defer allocator.free(path);
-            const contents = try std.fs.cwd().readFileAlloc(allocator, path, max_file_bytes);
+            const contents = try std.Io.Dir.cwd().readFileAlloc(allocator, path, max_file_bytes);
             defer allocator.free(contents);
 
             const parsed = try std.json.parseFromSlice(LoopStateJson, allocator, contents, .{
@@ -238,9 +238,9 @@ fn writeJsonFile(allocator: std.mem.Allocator, path: []const u8, value: anytype)
     try writer.print("{f}", .{std.json.fmt(value, .{})});
 
     if (std.fs.path.dirname(path)) |dir_name| {
-        try std.fs.cwd().makePath(dir_name);
+        _ = std.c.mkdir(@ptrCast(dir_name.ptr), 0o755);
     }
-    var file = try std.fs.cwd().createFile(path, .{ .truncate = true });
+    var file = try std.Io.Dir.cwd().createFile(path, .{ .truncate = true });
     defer file.close();
     try file.writeAll(rendered.items);
 }
@@ -274,8 +274,8 @@ test "file loop state store persists and reloads active loops" {
             .verification_pending = false,
             .verification_signal = try std.testing.allocator.dupe(u8, "VERIFIED"),
             .oracle_profile_id = try std.testing.allocator.dupe(u8, "oracle"),
-            .started_at_ms = std.time.milliTimestamp(),
-            .updated_at_ms = std.time.milliTimestamp(),
+            .started_at_ms = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds(),
+            .updated_at_ms = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds(),
         };
         defer state.deinit(std.testing.allocator);
 

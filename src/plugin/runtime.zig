@@ -121,11 +121,11 @@ const ManifestJson = struct {
 };
 
 fn discoverPlugins(allocator: std.mem.Allocator, root: []const u8) ![]PluginInfo {
-    var dir = std.fs.cwd().openDir(root, .{ .iterate = true }) catch |err| switch (err) {
+    var dir = std.Io.Dir.cwd().openDir(std.Io.Threaded.global_single_threaded.*.io(), root, .{ .iterate = true }) catch |err| switch (err) {
         error.FileNotFound => return allocator.alloc(PluginInfo, 0),
         else => return err,
     };
-    defer dir.close();
+    defer dir.close(std.Io.Threaded.global_single_threaded.*.io());
 
     var items: std.ArrayListUnmanaged(PluginInfo) = .empty;
     errdefer {
@@ -134,11 +134,11 @@ fn discoverPlugins(allocator: std.mem.Allocator, root: []const u8) ![]PluginInfo
     }
 
     var it = dir.iterate();
-    while (try it.next()) |entry| {
+    while (try it.next(std.Io.Threaded.global_single_threaded.*.io())) |entry| {
         if (entry.kind != .directory) continue;
         const manifest_path = try std.fs.path.join(allocator, &.{ root, entry.name, "plugin.json" });
         defer allocator.free(manifest_path);
-        const bytes = std.fs.cwd().readFileAlloc(allocator, manifest_path, 1024 * 1024) catch |err| switch (err) {
+        const bytes = std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), manifest_path, allocator, .limited(1024 * 1024)) catch |err| switch (err) {
             error.FileNotFound => continue,
             else => return err,
         };
@@ -174,10 +174,10 @@ test "plugin runtime loads local plugins and triggers hooks" {
     defer std.testing.allocator.free(root_path);
     const plugins_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "plugins", "demo" });
     defer std.testing.allocator.free(plugins_dir);
-    try std.fs.cwd().makePath(plugins_dir);
+    _ = std.c.mkdir(@ptrCast(plugins_dir.ptr), 0o755);
     const manifest_path = try std.fs.path.join(std.testing.allocator, &.{ plugins_dir, "plugin.json" });
     defer std.testing.allocator.free(manifest_path);
-    var file = try std.fs.cwd().createFile(manifest_path, .{ .truncate = true });
+    var file = try std.Io.Dir.cwd().createFile(manifest_path, .{ .truncate = true });
     defer file.close();
     try file.writeAll("{\"id\":\"demo\",\"hooks\":[\"tool.before\",\"tool.after\"]}");
 

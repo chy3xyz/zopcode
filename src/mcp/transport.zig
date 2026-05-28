@@ -76,9 +76,9 @@ pub const StdioMcpClient = struct {
     allocator: std.mem.Allocator,
     server_id: []u8,
     child: std.process.Child,
-    write_mutex: std.Thread.Mutex = .{},
-    mutex: std.Thread.Mutex = .{},
-    condition: std.Thread.Condition = .{},
+    write_mutex: std.atomic.Mutex = .unlocked,
+    mutex: std.atomic.Mutex = .unlocked,
+    condition: std.Io.Condition = .init,
     next_request_id: i64 = 1,
     responses: std.ArrayListUnmanaged(ResponseRecord) = .empty,
     reader_error: ?[]u8 = null,
@@ -173,7 +173,7 @@ pub const StdioMcpClient = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         self.closed = true;
         self.condition.broadcast();
         self.mutex.unlock();
@@ -181,7 +181,7 @@ pub const StdioMcpClient = struct {
         _ = self.child.kill() catch {};
         if (self.reader_thread) |thread| thread.join();
 
-        self.write_mutex.lock();
+        while (!self.write_mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.write_mutex.unlock();
         if (self.child.stdin) |*stdin| stdin.close();
         if (self.child.stdout) |*stdout| stdout.close();
@@ -251,7 +251,7 @@ pub const StdioMcpClient = struct {
 
     fn requestJson(self: *Self, allocator: std.mem.Allocator, method: []const u8, params_json: []const u8) ![]u8 {
         const request_id = blk: {
-            self.mutex.lock();
+            while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
             defer self.mutex.unlock();
             const id = self.next_request_id;
             self.next_request_id += 1;
@@ -265,7 +265,7 @@ pub const StdioMcpClient = struct {
         );
         defer allocator.free(payload);
 
-        self.write_mutex.lock();
+        while (!self.write_mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.write_mutex.unlock();
         if (self.child.stdin == null) return error.McpClientClosed;
         try protocol.writeMessage(self.child.stdin.?, payload);
@@ -280,14 +280,14 @@ pub const StdioMcpClient = struct {
         );
         defer self.allocator.free(payload);
 
-        self.write_mutex.lock();
+        while (!self.write_mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.write_mutex.unlock();
         if (self.child.stdin == null) return error.McpClientClosed;
         try protocol.writeMessage(self.child.stdin.?, payload);
     }
 
     fn waitForResponse(self: *Self, allocator: std.mem.Allocator, request_id: i64, timeout_ns: u64) ![]u8 {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         while (true) {
@@ -313,7 +313,7 @@ pub const StdioMcpClient = struct {
 
     fn readerMain(self: *Self) void {
         while (true) {
-            self.mutex.lock();
+            while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
             const should_stop = self.closed;
             self.mutex.unlock();
             if (should_stop) return;
@@ -347,7 +347,7 @@ pub const StdioMcpClient = struct {
         else
             try self.allocator.dupe(u8, "null");
 
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         try self.responses.append(self.allocator, .{
             .id = id,
@@ -358,7 +358,7 @@ pub const StdioMcpClient = struct {
     }
 
     fn failReader(self: *Self, error_name: []const u8) void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         if (self.reader_error != null) return;
         self.reader_error = self.allocator.dupe(u8, error_name) catch null;

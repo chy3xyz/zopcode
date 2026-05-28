@@ -64,7 +64,7 @@ pub const AppContext = struct {
         bootstrap: framework.AppBootstrapConfig,
         options: config.RuntimeOptions,
     ) !Self {
-        var framework_app = try framework.AppContext.init(allocator, bootstrap);
+        var framework_app = try framework.AppContext.init(allocator, std.Io.Threaded.global_single_threaded.*.io(), bootstrap);
         errdefer framework_app.deinit();
         const bootstrap_logger = framework_app.logger.child("app").child("bootstrap");
 
@@ -613,14 +613,14 @@ test "zig-opencode app context composes framework app context" {
     defer std.testing.allocator.free(root_path);
     const project_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "workspace" });
     defer std.testing.allocator.free(project_dir);
-    try std.fs.cwd().makePath(project_dir);
+    _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
     const config_path = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "opencode.json" });
     defer std.testing.allocator.free(config_path);
     const global_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "missing-global.json" });
     defer std.testing.allocator.free(global_path);
 
-    var file = try std.fs.cwd().createFile(config_path, .{});
+    var file = try std.Io.Dir.cwd().createFile(config_path, .{});
     defer file.close();
     try file.writeAll(
         \\{
@@ -745,7 +745,7 @@ test "builtin tool commands dispatch through command layer and validate input" {
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ fixture.project_dir, "note.txt" });
     defer std.testing.allocator.free(file_path);
     {
-        var file = try std.fs.cwd().createFile(file_path, .{});
+        var file = try std.Io.Dir.cwd().createFile(file_path, .{});
         defer file.close();
         try file.writeAll("hello tool");
     }
@@ -778,12 +778,12 @@ test "skill command lists and loads discovered skills through command layer" {
 
     const skill_dir = try std.fs.path.join(std.testing.allocator, &.{ fixture.project_dir, "skills", "demo-skill" });
     defer std.testing.allocator.free(skill_dir);
-    try std.fs.cwd().makePath(skill_dir);
+    _ = std.c.mkdir(@ptrCast(skill_dir.ptr), 0o755);
 
     const skill_path = try std.fs.path.join(std.testing.allocator, &.{ skill_dir, "SKILL.md" });
     defer std.testing.allocator.free(skill_path);
     {
-        var file = try std.fs.cwd().createFile(skill_path, .{ .truncate = true });
+        var file = try std.Io.Dir.cwd().createFile(skill_path, .{ .truncate = true });
         defer file.close();
         try file.writeAll(
             \\# Demo Skill
@@ -964,7 +964,7 @@ test "edit_file command runs configured formatter after delegated edit" {
         fn edit(_: *anyopaque, ctx: *const tools.ToolExecutionContext, _: []const framework.ValidationField) anyerror!tools.ToolResult {
             const resolved = try tools.context.resolvePath(ctx.allocator, ctx.working_dir, "note.txt");
             defer ctx.allocator.free(resolved);
-            var file = try std.fs.cwd().createFile(resolved, .{ .truncate = true });
+            var file = try std.Io.Dir.cwd().createFile(resolved, .{ .truncate = true });
             defer file.close();
             try file.writeAll("edited");
             return .{
@@ -1044,7 +1044,7 @@ test "hashline read to anchored edit succeeds through command surface" {
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ fixture.project_dir, "sample.txt" });
     defer std.testing.allocator.free(file_path);
     {
-        var file = try std.fs.cwd().createFile(file_path, .{});
+        var file = try std.Io.Dir.cwd().createFile(file_path, .{});
         defer file.close();
         try file.writeAll("alpha\nbeta\n");
     }
@@ -1090,7 +1090,7 @@ test "hashline read to anchored edit succeeds through command surface" {
     try std.testing.expect(edit_envelope.ok);
     defer std.testing.allocator.free(edit_envelope.result.?.success_json);
 
-    const contents = try std.fs.cwd().readFileAlloc(std.testing.allocator, file_path, 1024);
+    const contents = try std.Io.Dir.cwd().readFileAlloc(std.testing.allocator, file_path, 1024);
     defer std.testing.allocator.free(contents);
     try std.testing.expectEqualStrings("alpha\ngamma\n", contents);
 }
@@ -1109,7 +1109,7 @@ test "hashline stale edit returns mismatch payload with refreshed context" {
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ fixture.project_dir, "stale.txt" });
     defer std.testing.allocator.free(file_path);
     {
-        var file = try std.fs.cwd().createFile(file_path, .{});
+        var file = try std.Io.Dir.cwd().createFile(file_path, .{});
         defer file.close();
         try file.writeAll("beta\n");
     }
@@ -1134,7 +1134,7 @@ test "hashline stale edit returns mismatch payload with refreshed context" {
     defer std.testing.allocator.free(anchor_text);
 
     {
-        var file = try std.fs.cwd().createFile(file_path, .{ .truncate = true });
+        var file = try std.Io.Dir.cwd().createFile(file_path, .{ .truncate = true });
         defer file.close();
         try file.writeAll("delta\n");
     }
@@ -1184,7 +1184,7 @@ test "permission rules can block builtin tool execution before tool body runs" {
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ fixture.project_dir, "blocked.txt" });
     defer std.testing.allocator.free(file_path);
     {
-        var file = try std.fs.cwd().createFile(file_path, .{});
+        var file = try std.Io.Dir.cwd().createFile(file_path, .{});
         defer file.close();
         try file.writeAll("blocked");
     }
@@ -1315,11 +1315,11 @@ test "question builtin tool blocks until answers are supplied and returns format
         }
     }.run, .{ &fixture, question_tool, params[0..] });
 
-    const started = std.time.milliTimestamp();
+    const started = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
     var pending_questions = try fixture.app_context.questionRuntime().list(std.testing.allocator);
-    while (pending_questions.len == 0 and @as(u64, @intCast(std.time.milliTimestamp() - started)) < 1_000) {
+    while (pending_questions.len == 0 and @as(u64, @intCast(std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds() - started)) < 1_000) {
         std.testing.allocator.free(pending_questions);
-        std.Thread.sleep(5 * std.time.ns_per_ms);
+        const _ts = std.c.timespec{ .sec = 0, .nsec = 5_000_000 }; _ = std.c.nanosleep(&_ts, null);
         pending_questions = try fixture.app_context.questionRuntime().list(std.testing.allocator);
     }
     defer {
@@ -1369,14 +1369,14 @@ fn makeTestAppContextWithConfig(allocator: std.mem.Allocator, config_json: []con
     errdefer allocator.free(root_path);
     const project_dir = try std.fs.path.join(allocator, &.{ root_path, "workspace" });
     errdefer allocator.free(project_dir);
-    try std.fs.cwd().makePath(project_dir);
+    _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
     const config_path = try std.fs.path.join(allocator, &.{ project_dir, "opencode.json" });
     defer allocator.free(config_path);
     const global_path = try std.fs.path.join(allocator, &.{ root_path, "missing-global.json" });
     errdefer allocator.free(global_path);
 
-    var file = try std.fs.cwd().createFile(config_path, .{});
+    var file = try std.Io.Dir.cwd().createFile(config_path, .{});
     defer file.close();
     try file.writeAll(config_json);
 

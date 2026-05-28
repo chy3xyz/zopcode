@@ -118,7 +118,7 @@ pub const OpenAIClient = struct {
         const body = try buildRequestBody(self.allocator, request);
         defer self.allocator.free(body);
 
-        var http_client = std.http.Client{ .allocator = self.allocator };
+        var http_client = std.http.Client{ .allocator = self.allocator, .io = std.Io.Threaded.global_single_threaded.*.io() };
         defer http_client.deinit();
 
         const uri = try std.Uri.parse(self.endpoint);
@@ -200,11 +200,11 @@ pub const OpenAIClient = struct {
                 else => return err,
             };
             if (ch == '\n') {
-                const line = std.mem.trimRight(u8, line_buffer.items, "\r");
+                const line = std.mem.trimEnd(u8, line_buffer.items, "\r");
                 if (line.len == 0) {
                     try flushDataBuffer(self, ctx, &tool_buffers, &data_buffer, sink);
                 } else if (std.mem.startsWith(u8, line, "data:")) {
-                    const payload = std.mem.trimLeft(u8, line["data:".len..], " ");
+                    const payload = std.mem.trimStart(u8, line["data:".len..], " ");
                     try data_buffer.appendSlice(self.allocator, payload);
                 }
                 line_buffer.clearRetainingCapacity();
@@ -351,68 +351,67 @@ pub const OpenAIClient = struct {
     fn buildRequestBody(allocator: std.mem.Allocator, request: client_model.ProviderRequest) ![]u8 {
         var list: std.ArrayListUnmanaged(u8) = .empty;
         defer list.deinit(allocator);
-        const writer = list.writer(allocator);
-
-        try writer.writeByte('{');
-        try writer.print("\"model\":\"{s}\",\"stream\":true,\"max_output_tokens\":{d}", .{
+    
+        try list.append(allocator, '{');
+        try list.print(allocator, "\"model\":\"{s}\",\"stream\":true,\"max_output_tokens\":{d}", .{
             request.model.model_id,
             request.max_tokens,
         });
 
         if (request.system_prompt) |system_prompt| {
-            try writer.writeAll(",\"instructions\":");
-            try writeJsonString(writer, system_prompt);
+            try list.appendSlice(allocator, ",\"instructions\":");
+            try writeJsonString(&list, allocator, system_prompt);
         }
 
-        try writer.writeAll(",\"input\":[");
+        try list.appendSlice(allocator, ",\"input\":[");
         for (request.messages, 0..) |message, index| {
-            if (index > 0) try writer.writeByte(',');
-            try writer.writeAll("{\"role\":");
-            try writeJsonString(writer, message.role.asText());
-            try writer.writeAll(",\"content\":[{\"type\":\"input_text\",\"text\":");
-            try writeJsonString(writer, message.content);
-            try writer.writeAll("}]}");
+            if (index > 0) try list.append(allocator, ',');
+            try list.appendSlice(allocator, "{\"role\":");
+            try writeJsonString(&list, allocator, message.role.asText());
+            try list.appendSlice(allocator, ",\"content\":[{\"type\":\"input_text\",\"text\":");
+            try writeJsonString(&list, allocator, message.content);
+            try list.appendSlice(allocator, "}]}");
         }
-        try writer.writeByte(']');
+        try list.append(allocator, ']');
 
         if (request.tools.len > 0) {
-            try writer.writeAll(",\"tools\":[");
+            try list.appendSlice(allocator, ",\"tools\":[");
             for (request.tools, 0..) |tool_def, index| {
-                if (index > 0) try writer.writeByte(',');
-                try writer.writeAll("{\"type\":\"function\",\"name\":");
-                try writeJsonString(writer, tool_def.name);
-                try writer.writeAll(",\"description\":");
-                try writeJsonString(writer, tool_def.description);
-                try writer.writeAll(",\"parameters\":");
-                try writer.writeAll(tool_def.input_schema_json);
-                try writer.writeByte('}');
+                if (index > 0) try list.append(allocator, ',');
+                try list.appendSlice(allocator, "{\"type\":\"function\",\"name\":");
+                try writeJsonString(&list, allocator, tool_def.name);
+                try list.appendSlice(allocator, ",\"description\":");
+                try writeJsonString(&list, allocator, tool_def.description);
+                try list.appendSlice(allocator, ",\"parameters\":");
+                try list.appendSlice(allocator, tool_def.input_schema_json);
+                try list.append(allocator, '}');
             }
-            try writer.writeByte(']');
+            try list.append(allocator, ']');
         }
 
-        try writer.writeByte('}');
+        try list.append(allocator, '}');
         return allocator.dupe(u8, list.items);
     }
 
-    fn writeJsonString(writer: anytype, value: []const u8) !void {
-        try writer.writeByte('"');
+    fn writeJsonString(list: *std.ArrayListUnmanaged(u8), allocator: std.mem.Allocator, value: []const u8) !void {
+        try list.append(allocator, '"');
         for (value) |ch| {
             switch (ch) {
-                '"' => try writer.writeAll("\\\""),
-                '\\' => try writer.writeAll("\\\\"),
-                '\n' => try writer.writeAll("\\n"),
-                '\r' => try writer.writeAll("\\r"),
-                '\t' => try writer.writeAll("\\t"),
+                '"' => try list.appendSlice(allocator, "\\\""),
+                '\\' => try list.appendSlice(allocator, "\\\\"),
+                '\n' => try list.appendSlice(allocator, "\\n"),
+                '\r' => try list.appendSlice(allocator, "\\r"),
+                '\t' => try list.appendSlice(allocator, "\\t"),
                 else => {
                     if (ch < 32) {
-                        try writer.print("\\u00{x:0>2}", .{ch});
+                        try list.print(allocator, "\\u00{x:0>2}", .{ch});
                     } else {
-                        try writer.writeByte(ch);
+                        try list.append(allocator, ch);
                     }
                 },
             }
         }
-        try writer.writeByte('"');
+        try list.append(allocator, '"');
     }
 
     fn streamErased(ptr: *anyopaque, ctx: client_model.ProviderExecutionContext, request: client_model.ProviderRequest, sink: client_model.LlmEventSink) anyerror!void {

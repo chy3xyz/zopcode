@@ -55,7 +55,7 @@ pub const ServerServices = struct {
         });
         defer prompt_message.deinit(self.app_context.allocator);
 
-        const request_id = try std.fmt.allocPrint(self.allocator, "ipc_req_{d}", .{std.time.milliTimestamp()});
+        const request_id = try std.fmt.allocPrint(self.allocator, "ipc_req_{d}", .{std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds()});
         errdefer self.allocator.free(request_id);
         const model_ref = if (request.model) |raw_model|
             try parseModelRef(self.allocator, raw_model)
@@ -365,7 +365,7 @@ pub const ServerServices = struct {
             collected.deinit(self.allocator);
         }
 
-        const started_at = std.time.milliTimestamp();
+        const started_at = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
         while (true) {
             var batch = try self.app_context.eventBus().pollSubscription(self.allocator, subscription_id, if (limit == 0) 64 else limit - collected.items.len);
             defer batch.deinit(self.allocator);
@@ -383,10 +383,10 @@ pub const ServerServices = struct {
             if (follow_ms == 0) {
                 return collected.toOwnedSlice(self.allocator);
             }
-            if (std.time.milliTimestamp() - started_at >= @as(i64, @intCast(follow_ms))) {
+            if (std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds() - started_at >= @as(i64, @intCast(follow_ms))) {
                 return collected.toOwnedSlice(self.allocator);
             }
-            std.Thread.sleep(10 * std.time.ns_per_ms);
+            const _ts = std.c.timespec{ .sec = 0, .nsec = 10_000_000 }; _ = std.c.nanosleep(&_ts, null);
         }
     }
 };
@@ -631,14 +631,14 @@ pub fn makeServerFixture(allocator: std.mem.Allocator) !ServerFixture {
     errdefer allocator.free(root_path);
     const project_dir = try std.fs.path.join(allocator, &.{ root_path, "workspace" });
     errdefer allocator.free(project_dir);
-    try std.fs.cwd().makePath(project_dir);
+    _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
     const config_path = try std.fs.path.join(allocator, &.{ project_dir, "opencode.json" });
     defer allocator.free(config_path);
     const global_path = try std.fs.path.join(allocator, &.{ root_path, "missing-global.json" });
     errdefer allocator.free(global_path);
 
-    var file = try std.fs.cwd().createFile(config_path, .{});
+    var file = try std.Io.Dir.cwd().createFile(config_path, .{});
     defer file.close();
     try file.writeAll(
         \\{

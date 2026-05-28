@@ -23,7 +23,7 @@ pub fn formatReadLine(allocator: std.mem.Allocator, line_no: usize, line: []cons
 pub fn normalizeAnchorText(allocator: std.mem.Allocator, raw: []const u8) ![]u8 {
     var trimmed = std.mem.trim(u8, raw, " \t\r\n");
     while (trimmed.len > 0 and (trimmed[0] == '>' or trimmed[0] == '+' or trimmed[0] == '-' or trimmed[0] == ' ')) {
-        trimmed = std.mem.trimLeft(u8, trimmed[1..], " \t");
+        trimmed = std.mem.trimStart(u8, trimmed[1..], " \t");
     }
     if (std.mem.indexOfScalar(u8, trimmed, constants.content_separator)) |index| {
         trimmed = trimmed[0..index];

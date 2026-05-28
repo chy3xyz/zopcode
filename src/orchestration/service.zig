@@ -45,7 +45,7 @@ pub const OrchestrationService = struct {
         });
         defer prompt_message.deinit(self.deps.allocator);
 
-        const request_id = try std.fmt.allocPrint(allocator, "child_req_{d}_{s}", .{ std.time.milliTimestamp(), child_session.id });
+        const request_id = try std.fmt.allocPrint(allocator, "child_req_{d}_{s}", .{ std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds(), child_session.id });
         errdefer allocator.free(request_id);
 
         const accepted = try self.deps.session_runtime.submitAgentTask(.{
@@ -192,7 +192,7 @@ pub const OrchestrationService = struct {
         const owned_batch_id = if (batch.batch_id) |batch_id|
             try allocator.dupe(u8, batch_id)
         else
-            try std.fmt.allocPrint(allocator, "batch_{d}", .{std.time.milliTimestamp()});
+            try std.fmt.allocPrint(allocator, "batch_{d}", .{std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds()});
         errdefer allocator.free(owned_batch_id);
 
         var aggregated: types.AggregatedResult = .{
@@ -662,14 +662,14 @@ fn makeOrchestrationFixture(allocator: std.mem.Allocator) !OrchestrationFixture 
     errdefer allocator.free(root_path);
     const project_dir = try std.fs.path.join(allocator, &.{ root_path, "workspace" });
     errdefer allocator.free(project_dir);
-    try std.fs.cwd().makePath(project_dir);
+    _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
     const config_path = try std.fs.path.join(allocator, &.{ project_dir, "opencode.json" });
     defer allocator.free(config_path);
     const global_path = try std.fs.path.join(allocator, &.{ root_path, "missing-global.json" });
     errdefer allocator.free(global_path);
 
-    var file = try std.fs.cwd().createFile(config_path, .{});
+    var file = try std.Io.Dir.cwd().createFile(config_path, .{});
     defer file.close();
     try file.writeAll(
         \\{
@@ -714,7 +714,7 @@ fn makeOrchestrationFixture(allocator: std.mem.Allocator) !OrchestrationFixture 
 }
 
 const MockProvider = struct {
-    var mutex: std.Thread.Mutex = .{};
+    var mutex: std.atomic.Mutex = .unlocked;
     var active_count: usize = 0;
     var max_active: usize = 0;
     var last_system_prompt_storage: [4096]u8 = undefined;

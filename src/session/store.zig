@@ -106,7 +106,7 @@ pub const FileSessionStore = struct {
     };
 
     pub fn init(allocator: std.mem.Allocator, root_path: []const u8, event_bus: ?framework.EventBus, logger: ?*framework.Logger) !Self {
-        try std.fs.cwd().makePath(root_path);
+        _ = std.c.mkdir(@ptrCast(root_path.ptr), 0o755);
         return .{
             .allocator = allocator,
             .root_path = try allocator.dupe(u8, root_path),
@@ -132,7 +132,7 @@ pub const FileSessionStore = struct {
 
         const session_dir = try self.sessionDirPath(allocator, info.id);
         defer allocator.free(session_dir);
-        try std.fs.cwd().makePath(session_dir);
+        _ = std.c.mkdir(@ptrCast(session_dir.ptr), 0o755);
 
         const session_path = try self.sessionPath(allocator, info.id);
         defer allocator.free(session_path);
@@ -140,12 +140,12 @@ pub const FileSessionStore = struct {
 
         const messages_path = try self.messagesPath(allocator, info.id);
         defer allocator.free(messages_path);
-        const messages_file = try std.fs.cwd().createFile(messages_path, .{ .truncate = false });
+        const messages_file = try std.Io.Dir.cwd().createFile(messages_path, .{ .truncate = false });
         messages_file.close();
 
         const parts_path = try self.partsPath(allocator, info.id);
         defer allocator.free(parts_path);
-        const parts_file = try std.fs.cwd().createFile(parts_path, .{ .truncate = false });
+        const parts_file = try std.Io.Dir.cwd().createFile(parts_path, .{ .truncate = false });
         parts_file.close();
 
         try session_events.publishSessionCreatedEvent(self.allocator, self.event_bus, .{
@@ -166,7 +166,7 @@ pub const FileSessionStore = struct {
         const session_path = try self.sessionPath(allocator, session_id);
         defer allocator.free(session_path);
 
-        const contents = std.fs.cwd().readFileAlloc(allocator, session_path, max_file_bytes) catch |err| switch (err) {
+        const contents = std.Io.Dir.cwd().readFileAlloc(allocator, session_path, max_file_bytes) catch |err| switch (err) {
             error.FileNotFound => return null,
             else => return err,
         };
@@ -181,7 +181,7 @@ pub const FileSessionStore = struct {
     }
 
     pub fn listSessions(self: *Self, allocator: std.mem.Allocator) ![]session_model.SessionInfo {
-        var dir = std.fs.cwd().openDir(self.root_path, .{ .iterate = true }) catch |err| switch (err) {
+        var dir = std.Io.Dir.cwd().openDir(self.root_path, .{ .iterate = true }) catch |err| switch (err) {
             error.FileNotFound => return allocator.alloc(session_model.SessionInfo, 0),
             else => return err,
         };
@@ -200,7 +200,7 @@ pub const FileSessionStore = struct {
             const session_path = try std.fs.path.join(allocator, &.{ self.root_path, entry.name, session_file_name });
             defer allocator.free(session_path);
 
-            const contents = std.fs.cwd().readFileAlloc(allocator, session_path, max_file_bytes) catch |err| switch (err) {
+            const contents = std.Io.Dir.cwd().readFileAlloc(allocator, session_path, max_file_bytes) catch |err| switch (err) {
                 error.FileNotFound => continue,
                 else => return err,
             };
@@ -317,7 +317,7 @@ pub const FileSessionStore = struct {
     fn touchSession(self: *Self, allocator: std.mem.Allocator, session_id: schema.SessionId) !void {
         var info = (try self.getSession(allocator, session_id)) orelse return error.SessionNotFound;
         defer info.deinit(allocator);
-        info.updated_at_ms = std.time.milliTimestamp();
+        info.updated_at_ms = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
 
         const session_path = try self.sessionPath(allocator, session_id);
         defer allocator.free(session_path);
@@ -343,7 +343,7 @@ pub const FileSessionStore = struct {
         const path = try self.partsPath(allocator, session_id);
         defer allocator.free(path);
 
-        const contents = std.fs.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
+        const contents = std.Io.Dir.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
             error.FileNotFound => return 0,
             else => return err,
         };
@@ -359,7 +359,7 @@ pub const FileSessionStore = struct {
 
     fn readMessageRecords(self: *Self, allocator: std.mem.Allocator, path: []const u8) ![]message_model.MessageInfo {
         _ = self;
-        const contents = std.fs.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
+        const contents = std.Io.Dir.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
             error.FileNotFound => return allocator.alloc(message_model.MessageInfo, 0),
             else => return err,
         };
@@ -387,7 +387,7 @@ pub const FileSessionStore = struct {
 
     fn readPartRecords(self: *Self, allocator: std.mem.Allocator, path: []const u8) ![]PartRecord {
         _ = self;
-        const contents = std.fs.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
+        const contents = std.Io.Dir.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
             error.FileNotFound => return allocator.alloc(PartRecord, 0),
             else => return err,
         };
@@ -675,7 +675,7 @@ fn writeJsonFile(allocator: std.mem.Allocator, path: []const u8, value: anytype)
     try writer.print("{f}", .{std.json.fmt(value, .{})});
 
     try ensureParentDirectory(path);
-    var file = try std.fs.cwd().createFile(path, .{ .truncate = true });
+    var file = try std.Io.Dir.cwd().createFile(path, .{ .truncate = true });
     defer file.close();
     try file.writeAll(rendered.items);
 }
@@ -691,20 +691,20 @@ fn writeMessagesFile(allocator: std.mem.Allocator, path: []const u8, messages: [
     }
 
     try ensureParentDirectory(path);
-    var file = try std.fs.cwd().createFile(path, .{ .truncate = true });
+    var file = try std.Io.Dir.cwd().createFile(path, .{ .truncate = true });
     defer file.close();
     try file.writeAll(rendered.items);
 }
 
 fn ensureParentDirectory(path: []const u8) !void {
     if (std.fs.path.dirname(path)) |dir_name| {
-        try std.fs.cwd().makePath(dir_name);
+        _ = std.c.mkdir(@ptrCast(dir_name.ptr), 0o755);
     }
 }
 
 fn openAppendFile(path: []const u8) !std.fs.File {
-    var file = std.fs.cwd().openFile(path, .{ .mode = .read_write }) catch |err| switch (err) {
-        error.FileNotFound => try std.fs.cwd().createFile(path, .{ .read = true, .truncate = false }),
+    var file = std.Io.Dir.cwd().openFile(path, .{ .mode = .read_write }) catch |err| switch (err) {
+        error.FileNotFound => try std.Io.Dir.cwd().createFile(path, .{ .read = true, .truncate = false }),
         else => return err,
     };
     try file.seekFromEnd(0);

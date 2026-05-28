@@ -443,7 +443,7 @@ const HttpEventSubscription = struct {
     base_url: []u8,
     after_seq: u64,
     queue: std.ArrayListUnmanaged(server.RuntimeEventDto),
-    mutex: std.Thread.Mutex = .{},
+    mutex: std.atomic.Mutex = .unlocked,
     stop_requested: std.atomic.Value(bool),
     thread: ?std.Thread = null,
 
@@ -463,7 +463,7 @@ const HttpEventSubscription = struct {
 
     fn pollErased(ptr: *anyopaque, allocator: std.mem.Allocator, limit: usize) anyerror![]server.RuntimeEventDto {
         const self: *Self = @ptrCast(@alignCast(ptr));
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const count = if (limit == 0) self.queue.items.len else @min(limit, self.queue.items.len);
@@ -480,7 +480,7 @@ const HttpEventSubscription = struct {
         const self: *Self = @ptrCast(@alignCast(ptr));
         self.stop_requested.store(true, .release);
         if (self.thread) |thread| thread.join();
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         for (self.queue.items) |*item| item.deinit(self.allocator);
         self.queue.deinit(self.allocator);
@@ -489,7 +489,7 @@ const HttpEventSubscription = struct {
     }
 
     fn readerThreadMain(self: *Self) void {
-        var client = std.http.Client{ .allocator = self.allocator };
+        var client = std.http.Client{ .allocator = self.allocator, .io = std.Io.Threaded.global_single_threaded.*.io() };
         defer client.deinit();
 
         while (!self.stop_requested.load(.acquire)) {
@@ -520,12 +520,12 @@ const HttpEventSubscription = struct {
                 if (trimmed.len == 0) continue;
                 if (trimmed[0] == ':') continue;
                 if (!std.mem.startsWith(u8, trimmed, "data:")) continue;
-                const payload = std.mem.trimLeft(u8, trimmed["data:".len..], " ");
+                const payload = std.mem.trimStart(u8, trimmed["data:".len..], " ");
                 const parsed = std.json.parseFromSlice(server.RuntimeEventDto, self.allocator, payload, .{ .ignore_unknown_fields = true }) catch return;
                 defer parsed.deinit();
                 const event = parsed.value.clone(self.allocator) catch return;
 
-                self.mutex.lock();
+                while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
                 self.queue.append(self.allocator, event) catch {
                     self.mutex.unlock();
                     return;
@@ -567,7 +567,7 @@ const StdRequester = struct {
 
     fn request(self: *Self, allocator: std.mem.Allocator, method: server.HttpMethod, url: []const u8, body: ?[]const u8) !RequesterResponse {
         _ = self;
-        var client = std.http.Client{ .allocator = allocator };
+        var client = std.http.Client{ .allocator = allocator, .io = std.Io.Threaded.global_single_threaded.*.io() };
         defer client.deinit();
 
         const uri = try std.Uri.parse(url);
@@ -624,8 +624,8 @@ fn joinUrl(allocator: std.mem.Allocator, base_url: []const u8, suffix: []const u
 fn encodeJsonBody(allocator: std.mem.Allocator, value: anytype) ![]u8 {
     var out: std.ArrayListUnmanaged(u8) = .empty;
     defer out.deinit(allocator);
-    const writer = out.writer(allocator);
-    try writer.print("{f}", .{std.json.fmt(value, .{})});
+    
+    try out.print(allocator, "{f}", .{std.json.fmt(value, .{})});
     return allocator.dupe(u8, out.items);
 }
 

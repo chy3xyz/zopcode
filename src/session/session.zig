@@ -47,7 +47,7 @@ pub fn initFromCreateRequest(
     allocator: std.mem.Allocator,
     request: SessionCreateRequest,
 ) !SessionInfo {
-    const now = std.time.milliTimestamp();
+    const now = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
     return .{
         .id = try schema.nextSessionId(allocator),
         .title = try allocator.dupe(u8, request.title),

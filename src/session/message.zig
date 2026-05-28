@@ -70,7 +70,7 @@ pub fn initFromAppendRequest(
         .id = try schema.nextMessageId(allocator),
         .session_id = try allocator.dupe(u8, request.session_id),
         .role = request.role,
-        .created_at_ms = std.time.milliTimestamp(),
+        .created_at_ms = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds(),
         .parent_id = if (request.parent_id) |parent_id| try allocator.dupe(u8, parent_id) else null,
         .agent_id = if (request.agent_id) |agent_id| try allocator.dupe(u8, agent_id) else null,
         .provider_id = if (request.provider_id) |provider_id| try allocator.dupe(u8, provider_id) else null,

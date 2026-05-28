@@ -65,7 +65,7 @@ pub const SessionStatusUpdate = struct {
 pub const SessionStatusIndex = struct {
     allocator: std.mem.Allocator,
     items: std.ArrayListUnmanaged(SessionStatusInfo) = .empty,
-    mutex: std.Thread.Mutex = .{},
+    mutex: std.atomic.Mutex = .unlocked,
 
     const Self = @This();
 
@@ -74,7 +74,7 @@ pub const SessionStatusIndex = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         for (self.items.items) |*item| item.deinit(self.allocator);
@@ -82,7 +82,7 @@ pub const SessionStatusIndex = struct {
     }
 
     pub fn set(self: *Self, allocator: std.mem.Allocator, update: SessionStatusUpdate) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         if (self.findMutableLocked(update.session_id)) |existing| {
@@ -105,7 +105,7 @@ pub const SessionStatusIndex = struct {
             if (existing.task_id) |task_id| allocator.free(task_id);
             existing.task_id = next_task_id;
 
-            existing.updated_at_ms = std.time.milliTimestamp();
+            existing.updated_at_ms = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
             return;
         }
 
@@ -114,12 +114,12 @@ pub const SessionStatusIndex = struct {
             .status = update.status,
             .request_id = if (update.request_id) |request_id| try allocator.dupe(u8, request_id) else null,
             .task_id = if (update.task_id) |task_id| try allocator.dupe(u8, task_id) else null,
-            .updated_at_ms = std.time.milliTimestamp(),
+            .updated_at_ms = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds(),
         });
     }
 
     pub fn get(self: *Self, allocator: std.mem.Allocator, session_id: schema.SessionId) !?SessionStatusInfo {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const existing = self.findLocked(session_id) orelse return null;
@@ -127,7 +127,7 @@ pub const SessionStatusIndex = struct {
     }
 
     pub fn list(self: *Self, allocator: std.mem.Allocator) ![]SessionStatusInfo {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const cloned = try allocator.alloc(SessionStatusInfo, self.items.items.len);

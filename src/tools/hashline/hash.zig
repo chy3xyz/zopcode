@@ -4,7 +4,7 @@ const constants = @import("constants.zig");
 const hash_space = std.math.pow(usize, constants.hash_alphabet.len, constants.hash_len);
 
 pub fn normalizeLine(line: []const u8) []const u8 {
-    return std.mem.trimRight(u8, std.mem.trimRight(u8, line, "\r"), " \t");
+    return std.mem.trimEnd(u8, std.mem.trimEnd(u8, line, "\r"), " \t");
 }
 
 pub fn compute(line: []const u8) [constants.hash_len]u8 {

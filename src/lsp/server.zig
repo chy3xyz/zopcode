@@ -47,7 +47,7 @@ fn containsAnyMarker(allocator: std.mem.Allocator, directory: []const u8, marker
     for (markers) |marker| {
         const candidate = std.fs.path.join(allocator, &.{ directory, marker }) catch return false;
         defer allocator.free(candidate);
-        std.fs.cwd().access(candidate, .{}) catch continue;
+        std.Io.Dir.cwd().access(candidate, .{}) catch continue;
         return true;
     }
     return false;
@@ -63,11 +63,11 @@ test "server config matches extensions and resolves roots" {
     defer std.testing.allocator.free(project_dir);
     const nested_dir = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "src" });
     defer std.testing.allocator.free(nested_dir);
-    try std.fs.cwd().makePath(nested_dir);
+    _ = std.c.mkdir(@ptrCast(nested_dir.ptr), 0o755);
 
     const marker_path = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "build.zig" });
     defer std.testing.allocator.free(marker_path);
-    var marker_file = try std.fs.cwd().createFile(marker_path, .{});
+    var marker_file = try std.Io.Dir.cwd().createFile(marker_path, .{});
     defer marker_file.close();
     try marker_file.writeAll("test");
 

@@ -76,7 +76,7 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
     };
 }
 
-fn runShell(allocator: std.mem.Allocator, cwd: []const u8, command: []const u8) !std.process.Child.RunResult {
+fn runShell(allocator: std.mem.Allocator, cwd: []const u8, command: []const u8) !std.process.RunResult {
     const argv = if (builtin.os.tag == .windows)
         &[_][]const u8{ "powershell", "-NoProfile", "-Command", command }
     else

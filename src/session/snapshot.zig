@@ -35,7 +35,7 @@ pub const FileSnapshotStore = struct {
     const Self = @This();
 
     pub fn init(allocator: std.mem.Allocator, root_path: []const u8) !Self {
-        try std.fs.cwd().makePath(root_path);
+        _ = std.c.mkdir(@ptrCast(root_path.ptr), 0o755);
         return .{
             .allocator = allocator,
             .root_path = try allocator.dupe(u8, root_path),
@@ -49,13 +49,13 @@ pub const FileSnapshotStore = struct {
     pub fn recordBeforeMutation(self: *Self, allocator: std.mem.Allocator, session_id: schema.SessionId, path: []const u8) !SnapshotRecord {
         const snapshot_id = try schema.nextSnapshotId(allocator);
         errdefer allocator.free(snapshot_id);
-        const now = std.time.milliTimestamp();
+        const now = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
 
         const session_dir = try self.sessionDirPath(allocator, session_id);
         defer allocator.free(session_dir);
-        try std.fs.cwd().makePath(session_dir);
+        _ = std.c.mkdir(@ptrCast(session_dir.ptr), 0o755);
 
-        const contents = std.fs.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
+        const contents = std.Io.Dir.cwd().readFileAlloc(allocator, path, max_file_bytes) catch |err| switch (err) {
             error.FileNotFound => null,
             else => return err,
         };
@@ -70,7 +70,7 @@ pub const FileSnapshotStore = struct {
         if (contents) |bytes| {
             const content_path = try std.fs.path.join(allocator, &.{ session_dir, content_rel_path.? });
             defer allocator.free(content_path);
-            var file = try std.fs.cwd().createFile(content_path, .{ .truncate = true });
+            var file = try std.Io.Dir.cwd().createFile(content_path, .{ .truncate = true });
             defer file.close();
             try file.writeAll(bytes);
         }
@@ -98,7 +98,7 @@ pub const FileSnapshotStore = struct {
         const session_dir = try self.sessionDirPath(allocator, session_id);
         defer allocator.free(session_dir);
 
-        var dir = std.fs.cwd().openDir(session_dir, .{ .iterate = true }) catch |err| switch (err) {
+        var dir = std.Io.Dir.cwd().openDir(session_dir, .{ .iterate = true }) catch |err| switch (err) {
             error.FileNotFound => return allocator.alloc(SnapshotRecord, 0),
             else => return err,
         };
@@ -116,7 +116,7 @@ pub const FileSnapshotStore = struct {
             if (!std.mem.endsWith(u8, entry.name, ".json")) continue;
             const full_path = try std.fs.path.join(allocator, &.{ session_dir, entry.name });
             defer allocator.free(full_path);
-            const contents = try std.fs.cwd().readFileAlloc(allocator, full_path, max_file_bytes);
+            const contents = try std.Io.Dir.cwd().readFileAlloc(allocator, full_path, max_file_bytes);
             defer allocator.free(contents);
             const parsed = try std.json.parseFromSlice(SnapshotRecordJson, allocator, contents, .{ .ignore_unknown_fields = true });
             defer parsed.deinit();
@@ -213,7 +213,7 @@ fn findLatestForPath(records: []const SnapshotRecord, path: []const u8) ?Snapsho
 
 fn restoreRecord(allocator: std.mem.Allocator, root_path: []const u8, record: SnapshotRecord) !void {
     if (!record.existed_before) {
-        std.fs.cwd().deleteFile(record.path) catch |err| switch (err) {
+        std.Io.Dir.cwd().deleteFile(record.path) catch |err| switch (err) {
             error.FileNotFound => {},
             else => return err,
         };
@@ -224,11 +224,11 @@ fn restoreRecord(allocator: std.mem.Allocator, root_path: []const u8, record: Sn
     defer allocator.free(session_dir);
     const content_path = try std.fs.path.join(allocator, &.{ session_dir, record.content_rel_path.? });
     defer allocator.free(content_path);
-    const content = try std.fs.cwd().readFileAlloc(allocator, content_path, max_file_bytes);
+    const content = try std.Io.Dir.cwd().readFileAlloc(allocator, content_path, max_file_bytes);
     defer allocator.free(content);
 
-    if (std.fs.path.dirname(record.path)) |dir_name| try std.fs.cwd().makePath(dir_name);
-    var file = try std.fs.cwd().createFile(record.path, .{ .truncate = true });
+    if (std.fs.path.dirname(record.path)) |dir_name| _ = std.c.mkdir(@ptrCast(dir_name.ptr), 0o755);
+    var file = try std.Io.Dir.cwd().createFile(record.path, .{ .truncate = true });
     defer file.close();
     try file.writeAll(content);
 }
@@ -270,8 +270,8 @@ fn writeJsonFile(allocator: std.mem.Allocator, path: []const u8, value: anytype)
     const writer = rendered.writer(allocator);
     try writer.print("{f}", .{std.json.fmt(value, .{})});
 
-    if (std.fs.path.dirname(path)) |dir_name| try std.fs.cwd().makePath(dir_name);
-    var file = try std.fs.cwd().createFile(path, .{ .truncate = true });
+    if (std.fs.path.dirname(path)) |dir_name| _ = std.c.mkdir(@ptrCast(dir_name.ptr), 0o755);
+    var file = try std.Io.Dir.cwd().createFile(path, .{ .truncate = true });
     defer file.close();
     try file.writeAll(rendered.items);
 }
@@ -290,7 +290,7 @@ test "snapshot service records and reverts tracked files" {
     defer std.testing.allocator.free(target_path);
 
     {
-        var file = try std.fs.cwd().createFile(target_path, .{ .truncate = true });
+        var file = try std.Io.Dir.cwd().createFile(target_path, .{ .truncate = true });
         defer file.close();
         try file.writeAll("before");
     }
@@ -301,7 +301,7 @@ test "snapshot service records and reverts tracked files" {
 
     try service.recordFileBeforeMutation("session_01", target_path);
     {
-        var file = try std.fs.cwd().createFile(target_path, .{ .truncate = true });
+        var file = try std.Io.Dir.cwd().createFile(target_path, .{ .truncate = true });
         defer file.close();
         try file.writeAll("after");
     }
@@ -310,7 +310,7 @@ test "snapshot service records and reverts tracked files" {
     defer result.deinit(std.testing.allocator);
     try std.testing.expectEqual(@as(u32, 1), result.restored_count);
 
-    const reverted = try std.fs.cwd().readFileAlloc(std.testing.allocator, target_path, 1024);
+    const reverted = try std.Io.Dir.cwd().readFileAlloc(std.testing.allocator, target_path, 1024);
     defer std.testing.allocator.free(reverted);
     try std.testing.expectEqualStrings("before", reverted);
 }

@@ -21,7 +21,7 @@ pub const LoopService = struct {
     allocator: std.mem.Allocator,
     deps: Dependencies,
     loops: std.ArrayListUnmanaged(types.LoopState) = .empty,
-    mutex: std.Thread.Mutex = .{},
+    mutex: std.atomic.Mutex = .unlocked,
     subscription_id: ?u64 = null,
     watcher_thread: ?std.Thread = null,
     shutdown_requested: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
@@ -54,7 +54,7 @@ pub const LoopService = struct {
             self.subscription_id = null;
         }
 
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         for (self.loops.items) |*state| state.deinit(self.allocator);
         self.loops.deinit(self.allocator);
@@ -69,7 +69,7 @@ pub const LoopService = struct {
         }
 
         {
-            self.mutex.lock();
+            while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
             defer self.mutex.unlock();
             for (self.loops.items) |state| {
                 if (!state.active) continue;
@@ -79,7 +79,7 @@ pub const LoopService = struct {
             }
         }
 
-        const now = std.time.milliTimestamp();
+        const now = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
         const loop_id = try std.fmt.allocPrint(self.allocator, "loop_{d}", .{now});
         errdefer self.allocator.free(loop_id);
 
@@ -131,7 +131,7 @@ pub const LoopService = struct {
     }
 
     pub fn cancelLoop(self: *Self, loop_id: []const u8) !bool {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         for (self.loops.items) |*state| {
             if (!std.mem.eql(u8, state.loop_id, loop_id)) continue;
@@ -147,7 +147,7 @@ pub const LoopService = struct {
     }
 
     pub fn getLoop(self: *Self, allocator: std.mem.Allocator, loop_id: []const u8) !?types.LoopState {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         for (self.loops.items) |state| {
             if (std.mem.eql(u8, state.loop_id, loop_id)) return try state.clone(allocator);
@@ -156,7 +156,7 @@ pub const LoopService = struct {
     }
 
     pub fn listActive(self: *Self, allocator: std.mem.Allocator) ![]types.LoopState {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         var results: std.ArrayListUnmanaged(types.LoopState) = .empty;
@@ -179,7 +179,7 @@ pub const LoopService = struct {
             self.allocator.free(active);
         }
 
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         for (self.loops.items) |*state| state.deinit(self.allocator);
         self.loops.clearRetainingCapacity();
@@ -193,7 +193,7 @@ pub const LoopService = struct {
         while (!self.shutdown_requested.load(.acquire)) {
             self.pollSessionEvents() catch |err| {
                 self.logError("loop watcher poll failed", err, &.{});
-                std.Thread.sleep(10 * std.time.ns_per_ms);
+                const _ts = std.c.timespec{ .sec = 0, .nsec = 10_000_000 }; _ = std.c.nanosleep(&_ts, null);
             };
         }
     }
@@ -207,7 +207,7 @@ pub const LoopService = struct {
         }
 
         if (events_batch.len == 0) {
-            std.Thread.sleep(10 * std.time.ns_per_ms);
+            const _ts = std.c.timespec{ .sec = 0, .nsec = 10_000_000 }; _ = std.c.nanosleep(&_ts, null);
             return;
         }
 
@@ -487,7 +487,7 @@ pub const LoopService = struct {
     }
 
     fn markTerminal(self: *Self, loop_id: []const u8, phase: types.LoopPhase) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         for (self.loops.items) |*state| {
             if (!std.mem.eql(u8, state.loop_id, loop_id)) continue;
@@ -510,7 +510,7 @@ pub const LoopService = struct {
 
     fn persistAndTrack(self: *Self, state: types.LoopState) !void {
         try self.deps.state_store.put(self.allocator, state);
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         for (self.loops.items) |*existing| {
@@ -523,7 +523,7 @@ pub const LoopService = struct {
     }
 
     fn findMatchingLoops(self: *Self, session_id: []const u8) ![]types.LoopState {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         var results: std.ArrayListUnmanaged(types.LoopState) = .empty;
@@ -787,14 +787,14 @@ test "ultrawork failed verification restarts the work loop" {
 }
 
 fn waitForLoopPhase(service: *LoopService, loop_id: []const u8, expected: types.LoopPhase, timeout_ms: u64) !void {
-    const start = std.time.milliTimestamp();
-    while (@as(u64, @intCast(std.time.milliTimestamp() - start)) < timeout_ms) {
+    const start = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
+    while (@as(u64, @intCast(std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds() - start)) < timeout_ms) {
         var loaded = try service.getLoop(std.testing.allocator, loop_id);
         defer if (loaded) |*state| state.deinit(std.testing.allocator);
         if (loaded) |state| {
             if (state.phase == expected) return;
         }
-        std.Thread.sleep(10 * std.time.ns_per_ms);
+        const _ts = std.c.timespec{ .sec = 0, .nsec = 10_000_000 }; _ = std.c.nanosleep(&_ts, null);
     }
     return error.LoopPhaseTimeout;
 }

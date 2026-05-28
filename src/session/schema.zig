@@ -5,7 +5,7 @@ pub const MessageId = []const u8;
 pub const PartId = []const u8;
 pub const SnapshotId = []const u8;
 
-var id_mutex: std.Thread.Mutex = .{};
+var id_mutex: std.atomic.Mutex = .unlocked;
 var next_suffix: u64 = 1;
 
 pub fn nextSessionId(allocator: std.mem.Allocator) !SessionId {
@@ -32,7 +32,7 @@ fn nextId(allocator: std.mem.Allocator, prefix: []const u8) ![]const u8 {
 
     return std.fmt.allocPrint(allocator, "{s}_{d}_{d}", .{
         prefix,
-        std.time.milliTimestamp(),
+        std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds(),
         suffix,
     });
 }

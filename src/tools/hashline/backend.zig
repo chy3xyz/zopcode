@@ -66,7 +66,7 @@ pub fn editResult(
 }
 
 fn applyToPath(allocator: std.mem.Allocator, path: []const u8, edits: []const EditRequest) ![]u8 {
-    const original = try std.fs.cwd().readFileAlloc(allocator, path, 1024 * 1024);
+    const original = try std.Io.Dir.cwd().readFileAlloc(allocator, path, 1024 * 1024);
     defer allocator.free(original);
 
     var line_list = try splitLines(allocator, original);
@@ -95,7 +95,7 @@ fn applyToPath(allocator: std.mem.Allocator, path: []const u8, edits: []const Ed
 
     const rendered = try joinLines(allocator, line_list.items, original.len > 0 and original[original.len - 1] == '\n');
     defer allocator.free(rendered);
-    var file = try std.fs.cwd().createFile(path, .{ .truncate = true });
+    var file = try std.Io.Dir.cwd().createFile(path, .{ .truncate = true });
     defer file.close();
     try file.writeAll(rendered);
 
@@ -179,7 +179,7 @@ fn splitLines(allocator: std.mem.Allocator, contents: []const u8) !std.ArrayList
 
     var lines = std.mem.splitScalar(u8, normalized, '\n');
     while (lines.next()) |line| {
-        try parts.append(allocator, try allocator.dupe(u8, std.mem.trimRight(u8, line, "\r")));
+        try parts.append(allocator, try allocator.dupe(u8, std.mem.trimEnd(u8, line, "\r")));
     }
     return parts;
 }
@@ -276,7 +276,7 @@ test "hashline backend applies anchored replace successfully" {
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "sample.txt" });
     defer std.testing.allocator.free(file_path);
     {
-        var file = try std.fs.cwd().createFile(file_path, .{});
+        var file = try std.Io.Dir.cwd().createFile(file_path, .{});
         defer file.close();
         try file.writeAll("alpha\nbeta\n");
     }
@@ -293,7 +293,7 @@ test "hashline backend applies anchored replace successfully" {
     const response_json = try applyToPath(std.testing.allocator, file_path, (&[_]EditRequest{edit_request})[0..]);
     defer std.testing.allocator.free(response_json);
 
-    const contents = try std.fs.cwd().readFileAlloc(std.testing.allocator, file_path, 1024);
+    const contents = try std.Io.Dir.cwd().readFileAlloc(std.testing.allocator, file_path, 1024);
     defer std.testing.allocator.free(contents);
     try std.testing.expect(std.mem.indexOf(u8, contents, "gamma") != null);
 }

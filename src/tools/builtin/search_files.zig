@@ -63,7 +63,7 @@ fn searchDir(
     metadata: *std.ArrayListUnmanaged(u8),
     match_count: *usize,
 ) !void {
-    var dir = std.fs.cwd().openDir(path, .{ .iterate = true }) catch return;
+    var dir = std.Io.Dir.cwd().openDir(path, .{ .iterate = true }) catch return;
     defer dir.close();
 
     var iterator = dir.iterate();
@@ -87,7 +87,7 @@ fn searchFile(
     metadata: *std.ArrayListUnmanaged(u8),
     match_count: *usize,
 ) !void {
-    const contents = std.fs.cwd().readFileAlloc(allocator, path, 256 * 1024) catch return;
+    const contents = std.Io.Dir.cwd().readFileAlloc(allocator, path, 256 * 1024) catch return;
     defer allocator.free(contents);
 
     var lines = std.mem.splitScalar(u8, contents, '\n');

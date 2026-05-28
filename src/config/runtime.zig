@@ -222,7 +222,7 @@ test "config runtime loads layered config with deterministic precedence" {
     defer std.testing.allocator.free(root_path);
     const project_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "workspace" });
     defer std.testing.allocator.free(project_dir);
-    try std.fs.cwd().makePath(project_dir);
+    _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
     const global_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "global.json" });
     defer std.testing.allocator.free(global_path);
@@ -232,17 +232,17 @@ test "config runtime loads layered config with deterministic precedence" {
     defer std.testing.allocator.free(project_config);
 
     {
-        var file = try std.fs.cwd().createFile(global_path, .{});
+        var file = try std.Io.Dir.cwd().createFile(global_path, .{});
         defer file.close();
         try file.writeAll("{\"server\":{\"hostname\":\"127.0.0.1\"},\"model\":{\"default\":\"anthropic/claude-sonnet-4-5\"}}");
     }
     {
-        var file = try std.fs.cwd().createFile(custom_path, .{});
+        var file = try std.Io.Dir.cwd().createFile(custom_path, .{});
         defer file.close();
         try file.writeAll("{\"agent\":{\"default\":\"plan\"}}");
     }
     {
-        var file = try std.fs.cwd().createFile(project_config, .{});
+        var file = try std.Io.Dir.cwd().createFile(project_config, .{});
         defer file.close();
         try file.writeAll("{\"server\":{\"port\":9191},\"session\":{\"store\":{\"path\":\"data/sessions\"}}}");
     }
@@ -313,11 +313,11 @@ test "config runtime emits discovery and summary logs during load" {
     defer std.testing.allocator.free(root_path);
     const project_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "workspace" });
     defer std.testing.allocator.free(project_dir);
-    try std.fs.cwd().makePath(project_dir);
+    _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
     const project_config = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "opencode.json" });
     defer std.testing.allocator.free(project_config);
-    var file = try std.fs.cwd().createFile(project_config, .{});
+    var file = try std.Io.Dir.cwd().createFile(project_config, .{});
     defer file.close();
     try file.writeAll("{\"agent\":{\"default\":\"plan\"}}");
 
@@ -354,11 +354,11 @@ test "config runtime loads explicit lsp server definitions from project config" 
     defer std.testing.allocator.free(root_path);
     const project_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "workspace" });
     defer std.testing.allocator.free(project_dir);
-    try std.fs.cwd().makePath(project_dir);
+    _ = std.c.mkdir(@ptrCast(project_dir.ptr), 0o755);
 
     const project_config = try std.fs.path.join(std.testing.allocator, &.{ project_dir, "opencode.json" });
     defer std.testing.allocator.free(project_config);
-    var file = try std.fs.cwd().createFile(project_config, .{});
+    var file = try std.Io.Dir.cwd().createFile(project_config, .{});
     defer file.close();
     try file.writeAll(
         \\{

@@ -15,7 +15,7 @@ pub fn renderHashlineRead(allocator: std.mem.Allocator, contents: []const u8) ![
     var line_no: usize = 1;
     while (lines.next()) |line| : (line_no += 1) {
         if (line_no > 1) try writer.writeByte('\n');
-        const formatted = try anchor.formatReadLine(allocator, line_no, std.mem.trimRight(u8, line, "\r"));
+        const formatted = try anchor.formatReadLine(allocator, line_no, std.mem.trimEnd(u8, line, "\r"));
         defer allocator.free(formatted);
         try writer.writeAll(formatted);
     }

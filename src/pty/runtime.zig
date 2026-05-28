@@ -27,7 +27,7 @@ pub const PtyRuntime = struct {
     workspace_dir: []u8,
     backend_factory: backend.BackendFactory,
     entries: std.ArrayListUnmanaged(*Record) = .empty,
-    mutex: std.Thread.Mutex = .{},
+    mutex: std.atomic.Mutex = .unlocked,
 
     const Self = @This();
 
@@ -36,7 +36,7 @@ pub const PtyRuntime = struct {
         handle: ?backend.PtyHandle = null,
         chunks: std.ArrayListUnmanaged(types.OutputChunk) = .empty,
         next_seq: u64 = 1,
-        condition: std.Thread.Condition = .{},
+        condition: std.Io.Condition = .init,
         removed: bool = false,
 
         fn deinit(self: *Record, allocator: std.mem.Allocator) void {
@@ -77,7 +77,7 @@ pub const PtyRuntime = struct {
         errdefer self.allocator.free(cwd);
         const shell_name = try self.allocator.dupe(u8, request.shell orelse defaultShellName());
         errdefer self.allocator.free(shell_name);
-        const now = std.time.milliTimestamp();
+        const now = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
 
         const record = try self.allocator.create(Record);
         errdefer self.allocator.destroy(record);
@@ -93,7 +93,7 @@ pub const PtyRuntime = struct {
         };
         errdefer record.info.deinit(self.allocator);
 
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         try self.entries.append(self.allocator, record);
         self.mutex.unlock();
 
@@ -108,16 +108,16 @@ pub const PtyRuntime = struct {
             .cwd = record.info.cwd,
             .shell = request.shell,
         }, sink) catch |err| {
-            self.mutex.lock();
+            while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
             record.info.status = .failed;
-            record.info.updated_at_ms = std.time.milliTimestamp();
+            record.info.updated_at_ms = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
             record.info.exit_code = 1;
             self.mutex.unlock();
             try self.publishStatus(record.info.id, .failed, 1);
             return err;
         };
 
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         record.handle = handle;
         self.mutex.unlock();
         try self.publishStatus(record.info.id, .running, null);
@@ -125,7 +125,7 @@ pub const PtyRuntime = struct {
     }
 
     pub fn get(self: *Self, allocator: std.mem.Allocator, pty_id: []const u8) !?types.PtyInfo {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         const record = self.findRecordLocked(pty_id) orelse return null;
         if (record.removed) return null;
@@ -133,7 +133,7 @@ pub const PtyRuntime = struct {
     }
 
     pub fn list(self: *Self, allocator: std.mem.Allocator) ![]types.PtyInfo {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         var count: usize = 0;
@@ -153,7 +153,7 @@ pub const PtyRuntime = struct {
     }
 
     pub fn remove(self: *Self, pty_id: []const u8) !bool {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         const record = self.findRecordLocked(pty_id) orelse {
             self.mutex.unlock();
             return false;
@@ -173,7 +173,7 @@ pub const PtyRuntime = struct {
     }
 
     pub fn writeInput(self: *Self, pty_id: []const u8, data: []const u8) !bool {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         const record = self.findRecordLocked(pty_id) orelse {
             self.mutex.unlock();
             return false;
@@ -189,11 +189,11 @@ pub const PtyRuntime = struct {
     }
 
     pub fn readOutput(self: *Self, allocator: std.mem.Allocator, pty_id: []const u8, after_seq: u64, limit: usize, follow_ms: u64) ![]types.OutputChunk {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const record = self.findRecordLocked(pty_id) orelse return allocator.alloc(types.OutputChunk, 0);
-        const started_at = std.time.milliTimestamp();
+        const started_at = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
 
         while (true) {
             var available: usize = 0;
@@ -202,7 +202,7 @@ pub const PtyRuntime = struct {
             }
             if (available > 0 or follow_ms == 0 or record.removed or record.info.status != .running) break;
 
-            const elapsed_ms: u64 = @intCast(@max(std.time.milliTimestamp() - started_at, 0));
+            const elapsed_ms: u64 = @intCast(@max(std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds() - started_at, 0));
             if (elapsed_ms >= follow_ms) break;
             const wait_ms = follow_ms - elapsed_ms;
             record.condition.timedWait(&self.mutex, wait_ms * std.time.ns_per_ms) catch break;
@@ -228,7 +228,7 @@ pub const PtyRuntime = struct {
     }
 
     fn onOutput(self: *Self, pty_id: []const u8, stream: types.StreamKind, data: []const u8) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         const record = self.findRecordLocked(pty_id) orelse return;
         if (record.removed) return;
@@ -238,20 +238,20 @@ pub const PtyRuntime = struct {
             .pty_id = try self.allocator.dupe(u8, pty_id),
             .stream = stream,
             .data = try self.allocator.dupe(u8, data),
-            .ts_unix_ms = std.time.milliTimestamp(),
+            .ts_unix_ms = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds(),
         });
         record.next_seq += 1;
-        record.info.updated_at_ms = std.time.milliTimestamp();
+        record.info.updated_at_ms = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
         record.condition.broadcast();
     }
 
     fn onExit(self: *Self, pty_id: []const u8, exit_code: i32) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         const record = self.findRecordLocked(pty_id) orelse return;
         record.info.status = .exited;
         record.info.exit_code = exit_code;
-        record.info.updated_at_ms = std.time.milliTimestamp();
+        record.info.updated_at_ms = std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds();
         record.condition.broadcast();
     }
 
@@ -294,7 +294,7 @@ pub const PtyRuntime = struct {
 };
 
 fn nextPtyId(allocator: std.mem.Allocator) ![]u8 {
-    return std.fmt.allocPrint(allocator, "pty_{d}_{d}", .{ std.time.milliTimestamp(), std.crypto.random.int(u32) });
+    return std.fmt.allocPrint(allocator, "pty_{d}_{d}", .{ std.Io.Timestamp.now(std.Io.Threaded.global_single_threaded.*.io(), .real).toMilliseconds(), std.crypto.random.int(u32) });
 }
 
 fn defaultShellName() []const u8 {

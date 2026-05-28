@@ -23,7 +23,7 @@ pub const McpRuntime = struct {
     servers: []config.McpServerConfig,
     client_factory: transport.ClientFactory,
     entries: std.ArrayListUnmanaged(*Record) = .empty,
-    mutex: std.Thread.Mutex = .{},
+    mutex: std.atomic.Mutex = .unlocked,
 
     const Self = @This();
 
@@ -62,7 +62,7 @@ pub const McpRuntime = struct {
     }
 
     pub fn deinit(self: *Self) void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         self.client_factory.deinit(self.allocator);
@@ -95,7 +95,7 @@ pub const McpRuntime = struct {
     }
 
     pub fn disconnect(self: *Self, server_id: []const u8) !bool {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const record = self.recordByIdLocked(server_id) orelse return false;
@@ -115,7 +115,7 @@ pub const McpRuntime = struct {
     pub fn status(self: *Self, allocator: std.mem.Allocator) ![]types.Status {
         try self.connectAll();
 
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         var items: std.ArrayListUnmanaged(types.Status) = .empty;
@@ -152,7 +152,7 @@ pub const McpRuntime = struct {
     pub fn listTools(self: *Self, allocator: std.mem.Allocator) ![]types.ToolInfo {
         try self.connectAll();
 
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         var items: std.ArrayListUnmanaged(types.ToolInfo) = .empty;
@@ -172,7 +172,7 @@ pub const McpRuntime = struct {
     pub fn listResources(self: *Self, allocator: std.mem.Allocator, server_id: ?[]const u8) ![]types.ResourceInfo {
         try self.connectAll();
 
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         var items: std.ArrayListUnmanaged(types.ResourceInfo) = .empty;
@@ -205,7 +205,7 @@ pub const McpRuntime = struct {
     fn connectedRecord(self: *Self, server_id: []const u8) !*Record {
         try self.connectAll();
 
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
 
         const record = self.recordByIdLocked(server_id) orelse return error.McpServerNotFound;
@@ -214,7 +214,7 @@ pub const McpRuntime = struct {
     }
 
     fn ensureRecord(self: *Self, server: config.McpServerConfig) !*Record {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         if (self.recordByIdLocked(server.id)) |existing| {
             self.mutex.unlock();
             return existing;
@@ -282,13 +282,13 @@ pub const McpRuntime = struct {
     }
 
     fn appendRecord(self: *Self, record: *Record) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         try self.entries.append(self.allocator, record);
     }
 
     fn removeRecord(self: *Self, server_id: []const u8) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         for (self.entries.items, 0..) |entry, index| {
             if (!std.mem.eql(u8, entry.server_id, server_id)) continue;
@@ -307,7 +307,7 @@ pub const McpRuntime = struct {
     }
 
     fn publishStatusEvent(self: *Self, record: *Record) !void {
-        self.mutex.lock();
+        while (!self.mutex.tryLock()) { std.atomic.spinLoopHint(); }
         defer self.mutex.unlock();
         try self.publishStatusEventLocked(record);
     }

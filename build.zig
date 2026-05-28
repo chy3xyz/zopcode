@@ -8,7 +8,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    const framework_mod = framework_dep.module("framework");
+    const framework_mod = framework_dep.module("zaibase");
 
     const lib_mod = b.addModule("zig_opencode", .{
         .root_source_file = b.path("src/root.zig"),

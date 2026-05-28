@@ -26,7 +26,7 @@ fn execute(ctx: *const context_model.ToolExecutionContext, fields: []const frame
     const resolved = try context_model.resolvePath(ctx.allocator, ctx.working_dir, path);
     defer ctx.allocator.free(resolved);
 
-    const contents = try std.fs.cwd().readFileAlloc(ctx.allocator, resolved, 1024 * 1024);
+    const contents = try std.Io.Dir.cwd().readFileAlloc(ctx.allocator, resolved, 1024 * 1024);
     defer ctx.allocator.free(contents);
 
     const hashline_mode = paramBool(fields, "hashline") orelse false;
