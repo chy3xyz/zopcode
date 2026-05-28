@@ -1187,7 +1187,7 @@ fn makeRuntimeFixture() !RuntimeFixture {
     var tmp_dir = std.testing.tmpDir(.{});
     errdefer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     errdefer std.testing.allocator.free(root_path);
     const store_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "sessions" });
     defer std.testing.allocator.free(store_path);

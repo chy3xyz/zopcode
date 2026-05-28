@@ -304,7 +304,7 @@ test "project runtime resolves project identity and vcs status" {
 
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const workspace_root = try std.fs.path.join(std.testing.allocator, &.{ root_path, "workspaces" });
     defer std.testing.allocator.free(workspace_root);
@@ -337,7 +337,7 @@ test "project runtime workspace lifecycle create list remove works" {
 
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const workspace_root = try std.fs.path.join(std.testing.allocator, &.{ root_path, "workspaces" });
     defer std.testing.allocator.free(workspace_root);

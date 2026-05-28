@@ -339,10 +339,6 @@ test "local transport preserves client boundary and returns session operations" 
 }
 
 test "local transport exposes permission and question interaction surfaces" {
-    if (std.process.getEnvVarOwned(std.testing.allocator, "SKIP_PERMISSION_QUESTION_CLIENT_TEST")) |value| {
-        std.testing.allocator.free(value);
-        return error.SkipZigTest;
-    } else |_| {}
     var fixture = try server.services.makeServerFixture(std.testing.allocator);
     defer fixture.deinit();
     var services = server.ServerServices.init(std.testing.allocator, &fixture.app_context);

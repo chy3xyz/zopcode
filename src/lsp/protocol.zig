@@ -55,7 +55,7 @@ test "protocol writes and reads content-length framed messages" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(path);
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ path, "protocol.txt" });
     defer std.testing.allocator.free(file_path);

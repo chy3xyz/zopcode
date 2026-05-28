@@ -659,10 +659,6 @@ test "project and workspace endpoints return project/workspace surfaces" {
 }
 
 test "permission and question endpoints list and reply pending interactions" {
-    if (std.process.getEnvVarOwned(std.testing.allocator, "SKIP_PERMISSION_QUESTION_HTTP_TEST")) |value| {
-        std.testing.allocator.free(value);
-        return error.SkipZigTest;
-    } else |_| {}
     var fixture = try services_model.makeServerFixture(std.testing.allocator);
     defer fixture.deinit();
     var services = services_model.ServerServices.init(std.testing.allocator, &fixture.app_context);

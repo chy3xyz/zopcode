@@ -70,7 +70,7 @@ test "loader can parse nested json config into flat fields" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const config_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "zopcode.json" });
     defer std.testing.allocator.free(config_path);

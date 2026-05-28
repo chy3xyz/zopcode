@@ -436,10 +436,6 @@ test "server services create session submit prompt and report status" {
 }
 
 test "server services expose pending permission and question interactions" {
-    if (std.process.getEnvVarOwned(std.testing.allocator, "SKIP_PERMISSION_QUESTION_SERVICE_TEST")) |value| {
-        std.testing.allocator.free(value);
-        return error.SkipZigTest;
-    } else |_| {}
     var fixture = try makeServerFixture(std.testing.allocator);
     defer fixture.deinit();
 
@@ -627,7 +623,7 @@ pub fn makeServerFixture(allocator: std.mem.Allocator) !ServerFixture {
     var tmp_dir = std.testing.tmpDir(.{});
     errdefer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(allocator, ".");
+    const root_path = try allocator.dupe(u8, ".");
     errdefer allocator.free(root_path);
     const project_dir = try std.fs.path.join(allocator, &.{ root_path, "workspace" });
     errdefer allocator.free(project_dir);

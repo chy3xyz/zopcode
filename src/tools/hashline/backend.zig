@@ -270,7 +270,7 @@ test "hashline backend applies anchored replace successfully" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "sample.txt" });
     defer std.testing.allocator.free(file_path);
@@ -292,7 +292,7 @@ test "hashline backend applies anchored replace successfully" {
     const response_json = try applyToPath(std.testing.allocator, file_path, (&[_]EditRequest{edit_request})[0..]);
     defer std.testing.allocator.free(response_json);
 
-    const contents = try std.Io.Dir.cwd().readFileAlloc(std.testing.allocator, file_path, 1024);
+    const contents = try std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), std.testing.allocator, file_path, .limited(1024));
     defer std.testing.allocator.free(contents);
     try std.testing.expect(std.mem.indexOf(u8, contents, "gamma") != null);
 }

@@ -139,7 +139,7 @@ fn noopError(_: *anyopaque, _: []const u8) void {}
 
 test "llm module exports are stable" {
     try std.testing.expectEqualStrings("llm", MODULE_NAME);
-    try std.testing.expectEqual(MODULE_STAGE.implemented, MODULE_STAGE);
+    try std.testing.expectEqual(@as(ModuleStage, .implemented), MODULE_STAGE);
 }
 
 test "LlmRuntime can be created and destroyed" {

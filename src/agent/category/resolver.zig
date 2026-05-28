@@ -116,7 +116,7 @@ test "category execution plan includes prompt append and variant data" {
 test "category resolver selects openai when credentials are ready" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const auth_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "provider-auth.json" });
     defer std.testing.allocator.free(auth_path);
@@ -145,7 +145,7 @@ test "category resolver selects openai when credentials are ready" {
 test "category resolver falls back to anthropic when openai is unready" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const auth_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "provider-auth.json" });
     defer std.testing.allocator.free(auth_path);

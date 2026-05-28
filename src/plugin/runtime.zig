@@ -170,7 +170,7 @@ test "plugin runtime loads local plugins and triggers hooks" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const plugins_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "plugins", "demo" });
     defer std.testing.allocator.free(plugins_dir);

@@ -218,7 +218,7 @@ test "config runtime loads layered config with deterministic precedence" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const project_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "workspace" });
     defer std.testing.allocator.free(project_dir);
@@ -309,7 +309,7 @@ test "config runtime emits discovery and summary logs during load" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const project_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "workspace" });
     defer std.testing.allocator.free(project_dir);
@@ -350,7 +350,7 @@ test "config runtime loads explicit lsp server definitions from project config" 
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const project_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "workspace" });
     defer std.testing.allocator.free(project_dir);

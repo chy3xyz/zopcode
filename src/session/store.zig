@@ -711,7 +711,7 @@ test "file session store supports create get list append and reopen" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const store_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "sessions" });
     defer std.testing.allocator.free(store_path);
@@ -804,7 +804,7 @@ test "file session store can update message completion state" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const store_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "sessions" });
     defer std.testing.allocator.free(store_path);
@@ -838,7 +838,7 @@ test "file session store mutation logs include stable identity fields" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const store_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "sessions" });
     defer std.testing.allocator.free(store_path);

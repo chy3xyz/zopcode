@@ -281,7 +281,7 @@ test "snapshot service records and reverts tracked files" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const snapshot_root = try std.fs.path.join(std.testing.allocator, &.{ root_path, "snapshots" });
     defer std.testing.allocator.free(snapshot_root);
@@ -309,7 +309,7 @@ test "snapshot service records and reverts tracked files" {
     defer result.deinit(std.testing.allocator);
     try std.testing.expectEqual(@as(u32, 1), result.restored_count);
 
-    const reverted = try std.Io.Dir.cwd().readFileAlloc(std.testing.allocator, target_path, 1024);
+    const reverted = try std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), std.testing.allocator, target_path, .limited(1024));
     defer std.testing.allocator.free(reverted);
     try std.testing.expectEqualStrings("before", reverted);
 }

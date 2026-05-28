@@ -257,7 +257,7 @@ test "provider registry can register openai as builtin provider" {
 test "provider registry default model prefers ready provider" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const auth_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "provider-auth.json" });
     defer std.testing.allocator.free(auth_path);
@@ -283,7 +283,7 @@ test "provider registry default model prefers ready provider" {
 test "provider registry catalog reflects auth status" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const auth_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "provider-auth.json" });
     defer std.testing.allocator.free(auth_path);
@@ -322,7 +322,7 @@ test "provider registry catalog reflects auth status" {
 test "provider registry passes persisted api key into client creation context" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const auth_path = try std.fs.path.join(std.testing.allocator, &.{ root_path, "provider-auth.json" });
     defer std.testing.allocator.free(auth_path);

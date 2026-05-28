@@ -714,10 +714,6 @@ test "http transport can use injected requester for session routes" {
 }
 
 test "http transport can use injected requester for permission and question routes" {
-    if (std.process.getEnvVarOwned(std.testing.allocator, "SKIP_PERMISSION_QUESTION_CLIENT_TEST")) |value| {
-        std.testing.allocator.free(value);
-        return error.SkipZigTest;
-    } else |_| {}
     const RouteRequester = struct {
         allocator: std.mem.Allocator,
         services: *server.ServerServices,

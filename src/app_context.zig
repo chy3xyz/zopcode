@@ -609,7 +609,7 @@ test "zopcode app context composes framework app context" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const project_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "workspace" });
     defer std.testing.allocator.free(project_dir);
@@ -1090,7 +1090,7 @@ test "hashline read to anchored edit succeeds through command surface" {
     try std.testing.expect(edit_envelope.ok);
     defer std.testing.allocator.free(edit_envelope.result.?.success_json);
 
-    const contents = try std.Io.Dir.cwd().readFileAlloc(std.testing.allocator, file_path, 1024);
+    const contents = try std.Io.Dir.cwd().readFileAlloc(std.Io.Threaded.global_single_threaded.*.io(), std.testing.allocator, file_path, .limited(1024));
     defer std.testing.allocator.free(contents);
     try std.testing.expectEqualStrings("alpha\ngamma\n", contents);
 }
@@ -1365,7 +1365,7 @@ fn makeTestAppContextWithConfig(allocator: std.mem.Allocator, config_json: []con
     var tmp_dir = std.testing.tmpDir(.{});
     errdefer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(allocator, ".");
+    const root_path = try allocator.dupe(u8, ".");
     errdefer allocator.free(root_path);
     const project_dir = try std.fs.path.join(allocator, &.{ root_path, "workspace" });
     errdefer allocator.free(project_dir);

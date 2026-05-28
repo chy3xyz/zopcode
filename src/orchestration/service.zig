@@ -657,7 +657,7 @@ fn makeOrchestrationFixture(allocator: std.mem.Allocator) !OrchestrationFixture 
     var tmp_dir = std.testing.tmpDir(.{});
     errdefer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(allocator, ".");
+    const root_path = try allocator.dupe(u8, ".");
     errdefer allocator.free(root_path);
     const project_dir = try std.fs.path.join(allocator, &.{ root_path, "workspace" });
     errdefer allocator.free(project_dir);

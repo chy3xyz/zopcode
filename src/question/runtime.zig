@@ -243,10 +243,6 @@ fn encodeJsonAlloc(allocator: std.mem.Allocator, value: anytype) ![]u8 {
 }
 
 test "question runtime answered and rejected flows" {
-    if (std.process.getEnvVarOwned(std.testing.allocator, "SKIP_QUESTION_RUNTIME_TEST")) |value| {
-        std.testing.allocator.free(value);
-        return error.SkipZigTest;
-    } else |_| {}
     var memory_sink = framework.MemorySink.init(std.testing.allocator, 64);
     defer memory_sink.deinit();
     var logger = framework.Logger.init(memory_sink.asLogSink(), .trace);

@@ -491,7 +491,7 @@ test "lsp runtime reuses clients and updates diagnostics cache via sink" {
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const workspace_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "workspace" });
     defer std.testing.allocator.free(workspace_dir);
@@ -503,7 +503,7 @@ test "lsp runtime reuses clients and updates diagnostics cache via sink" {
     defer std.testing.allocator.free(marker_path);
     var marker = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), marker_path, .{});
     defer marker.close(std.Io.Threaded.global_single_threaded.*.io());
-    try marker.writeAll("test");
+    try marker.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "test");
 
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ src_dir, "main.zig" });
     defer std.testing.allocator.free(file_path);
@@ -603,7 +603,7 @@ test "lsp runtime keeps failed server entries in error state and does not treat 
     var tmp_dir = std.testing.tmpDir(.{});
     defer tmp_dir.cleanup();
 
-    const root_path = try tmp_dir.dir.realpathAlloc(std.testing.allocator, ".");
+    const root_path = try std.testing.allocator.dupe(u8, ".");
     defer std.testing.allocator.free(root_path);
     const workspace_dir = try std.fs.path.join(std.testing.allocator, &.{ root_path, "workspace" });
     defer std.testing.allocator.free(workspace_dir);
@@ -615,7 +615,7 @@ test "lsp runtime keeps failed server entries in error state and does not treat 
     defer std.testing.allocator.free(marker_path);
     var marker = try std.Io.Dir.cwd().createFile(std.Io.Threaded.global_single_threaded.*.io(), marker_path, .{});
     defer marker.close(std.Io.Threaded.global_single_threaded.*.io());
-    try marker.writeAll("test");
+    try marker.writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), "test");
 
     const file_path = try std.fs.path.join(std.testing.allocator, &.{ src_dir, "main.zig" });
     defer std.testing.allocator.free(file_path);
