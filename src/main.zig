@@ -33,6 +33,11 @@ pub fn main(ctx: std.process.Init.Minimal) !void {
         while (true) { const ts = std.c.timespec{ .sec = 1, .nsec = 0 }; _ = std.c.nanosleep(&ts, null); }
     }
 
-    const sio2 = std.Io.Threaded.global_single_threaded.*.io();
-    try std.Io.File.stdout().writeStreamingAll(sio2, "zopcode bootstrap ready\n");
+    // No subcommand — default to TUI mode
+    {
+        var app_context = try zopcode.AppContext.init(std.heap.page_allocator, .{ .console_log_enabled = false });
+        defer app_context.deinit();
+        try zopcode.tui.runLocal(allocator, &app_context);
+        return;
+    }
 }
