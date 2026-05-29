@@ -99,7 +99,72 @@ pub const TerminalApp = struct {
         }
     }
 
-    pub fn runInteractive(self: *Self) !void { _ = self; }
+    pub fn runInteractive(self: *Self) !void {
+        const io = std.Io.Threaded.global_single_threaded.*.io();
+        const stdout = std.Io.File.stdout();
+
+        try stdout.writeStreamingAll(io, "zopcode v0.1.0 — type your prompt, Ctrl+C to exit\n\n");
+
+        while (true) {
+            // Render current state
+            try self.renderTo(stdout, io);
+
+            // Prompt
+            try stdout.writeStreamingAll(io, "\n> ");
+            try stdout.writeStreamingAll(io, "\x1b[?25h"); // show cursor
+
+            // Read line from stdin
+            const line = try readLineFromStdin(self.allocator);
+            defer self.allocator.free(line);
+
+            const trimmed = std.mem.trim(u8, line, " \t\r\n");
+            if (trimmed.len == 0) continue;
+            if (std.mem.eql(u8, trimmed, "quit") or std.mem.eql(u8, trimmed, "exit")) break;
+
+            // Submit prompt
+            var accepted = self.submitPrompt(trimmed) catch |err| {
+                const err_msg = try std.fmt.allocPrint(self.allocator, "error: {}", .{err});
+                defer self.allocator.free(err_msg);
+                try self.view_model.appendEventLine(err_msg);
+                continue;
+            };
+            defer accepted.deinit(self.allocator);
+
+            // Wait for completion
+            try self.view_model.setStatus("running");
+            var wait_iterations: usize = 0;
+            while (wait_iterations < 200) : (wait_iterations += 1) {
+                _ = try self.pumpEvents(16);
+                if (self.view_model.status.len == 0 or std.mem.eql(u8, self.view_model.status, "idle")) break;
+                std.Io.sleep(io, std.Io.Duration.fromMilliseconds(100), .awake) catch {};  
+            }
+
+            // Final render
+            _ = try self.pumpEvents(64);
+            try stdout.writeStreamingAll(io, "\n");
+        }
+
+        try stdout.writeStreamingAll(io, "\x1b[?25h"); // ensure cursor visible
+        try stdout.writeStreamingAll(io, "goodbye.\n");
+    }
+
+    fn readLineFromStdin(allocator: std.mem.Allocator) ![]u8 {
+        const stdin_fd = std.Io.File.stdin().handle;
+        var buf: [4096]u8 = undefined;
+        var line: std.ArrayList(u8) = .empty;
+        defer line.deinit(allocator);
+        while (true) {
+            const n = std.posix.read(stdin_fd, &buf) catch return error.ReadError;
+            if (n == 0) {
+                if (line.items.len == 0) return error.EndOfInput;
+                return try line.toOwnedSlice(allocator);
+            }
+            for (buf[0..n]) |ch| {
+                if (ch == '\n') return try line.toOwnedSlice(allocator);
+                if (ch != '\r') try line.append(allocator, ch);
+            }
+        }
+    }
 
     fn ensureActiveSession(self: *Self, text: []const u8) ![]const u8 {
         if (self.view_model.active_session_id) |session_id| return session_id;
