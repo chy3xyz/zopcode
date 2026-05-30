@@ -103,7 +103,8 @@ pub const TerminalApp = struct {
         const io = std.Io.Threaded.global_single_threaded.*.io();
         const stdout = std.Io.File.stdout();
 
-        try stdout.writeStreamingAll(io, "zopcode v0.1.0 — type your prompt, Ctrl+C to exit\n\n");
+        try stdout.writeStreamingAll(io, "zopcode v0.1.0\n");
+        try stdout.writeStreamingAll(io, "type your prompt, Ctrl+C to exit\n\n");
 
         while (true) {
             // Render current state

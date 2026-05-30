@@ -37,7 +37,11 @@ pub fn main(ctx: std.process.Init.Minimal) !void {
     {
         var app_context = try zopcode.AppContext.init(std.heap.page_allocator, .{ .console_log_enabled = false });
         defer app_context.deinit();
-        try zopcode.tui.runLocal(allocator, &app_context);
+        zopcode.tui.runLocal(allocator, &app_context) catch |err| {
+            const msg = try std.fmt.allocPrint(allocator, "TUI error: {}\n", .{err});
+            defer allocator.free(msg);
+            try std.Io.File.stderr().writeStreamingAll(std.Io.Threaded.global_single_threaded.*.io(), msg);
+        };
         return;
     }
 }
