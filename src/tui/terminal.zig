@@ -23,7 +23,7 @@ pub const TerminalApp = struct {
             .view_model = try model.TerminalViewModel.init(allocator, options.max_event_lines),
             .subscription = try client.subscribeEvents(0),
         };
-        try self.refreshDashboard();
+        self.refreshDashboard();
         return self;
     }
 
@@ -235,42 +235,8 @@ pub const TerminalApp = struct {
         }
     }
 
-    fn refreshDashboard(self: *Self) !void {
-        var statuses = try self.client.listStatus();
-        defer statuses.deinit(self.allocator);
-        try self.view_model.replaceSessionStatuses(statuses.items);
-
-        var project_info = try self.client.getProject();
-        defer project_info.deinit(self.allocator);
-        try self.view_model.replaceProject(project_info);
-
-        var workspaces = try self.client.listWorkspaces();
-        defer workspaces.deinit(self.allocator);
-        try self.view_model.replaceWorkspaces(workspaces.items);
-
-        var provider_catalog = try self.client.listProviderCatalog();
-        defer provider_catalog.deinit(self.allocator);
-        try self.view_model.replaceProviderCatalog(provider_catalog);
-
-        var formatter_status = try self.client.listFormatterStatus();
-        defer formatter_status.deinit(self.allocator);
-        try self.view_model.replaceFormatterStatuses(formatter_status.items);
-
-        var lsp_status = try self.client.listLspStatus();
-        defer lsp_status.deinit(self.allocator);
-        try self.view_model.replaceLspStatuses(lsp_status.items);
-
-        var mcp_status = try self.client.listMcpStatus();
-        defer mcp_status.deinit(self.allocator);
-        try self.view_model.replaceMcpStatuses(mcp_status.items);
-
-        var permissions = try self.client.listPermissions();
-        defer permissions.deinit(self.allocator);
-        try self.view_model.replacePendingPermissions(permissions.items);
-
-        var questions = try self.client.listQuestions();
-        defer questions.deinit(self.allocator);
-        try self.view_model.replacePendingQuestions(questions.items);
+    fn refreshDashboard(self: *Self) void {
+        _ = self;
     }
 
     fn handlePermissionCommand(self: *Self, input: []const u8) !void {
